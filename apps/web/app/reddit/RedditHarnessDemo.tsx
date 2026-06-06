@@ -386,11 +386,8 @@ function FinalThreads({ threads }: { threads: RedditLatestPayload["threads"] }) 
       <PanelHeader title="Final high-signal threads" subtitle="The evidence set Module 2 can consume." />
       <div className="mt-4 grid gap-3">
         {threads.slice(0, 8).map((thread) => (
-          <a
+          <div
             key={thread.id}
-            href={thread.url}
-            target="_blank"
-            rel="noreferrer"
             className="group grid grid-cols-[1fr_auto] gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-zinc-300 hover:bg-white max-sm:grid-cols-1"
           >
             <div>
@@ -406,15 +403,27 @@ function FinalThreads({ threads }: { threads: RedditLatestPayload["threads"] }) 
                   ))}
               </div>
             </div>
-            <div className="flex items-start gap-2 text-right max-sm:text-left">
+            <div className="flex flex-col items-end gap-3 text-right max-sm:items-start max-sm:text-left">
               <div>
                 <div className="text-xs font-medium uppercase text-zinc-500">{thread.subreddit}</div>
                 <div className="mt-1 text-2xl font-semibold text-zinc-950">{thread.relevance_score}</div>
                 <div className="text-xs text-zinc-500">relevance</div>
               </div>
-              <ArrowUpRight className="mt-1 h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-900" />
+              <div className="flex flex-wrap justify-end gap-2 max-sm:justify-start">
+                <a href={thread.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50">
+                  Reddit
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+                <form action="/api/codex-research" method="post">
+                  <input type="hidden" name="threadId" value={thread.id} />
+                  <Button type="submit" variant="secondary">
+                    <Play className="h-4 w-4" />
+                    Run Codex
+                  </Button>
+                </form>
+              </div>
             </div>
-          </a>
+          </div>
         ))}
       </div>
     </section>

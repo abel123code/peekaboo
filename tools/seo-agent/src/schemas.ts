@@ -482,12 +482,84 @@ export const RedditInvestigationTraceSchema = z
   })
   .strict();
 
+export const CodexResearchExecutionModeSchema = z.enum(["real_codex", "virtual_fallback"]);
+
+export const CodexResearchStatusSchema = z.enum(["queued", "running", "failed", "completed"]);
+
+export const CodexTraceEventSchema = z
+  .object({
+    id: z.string().min(1),
+    timestamp: z.string().min(1),
+    phase: z.string().min(1),
+    actor: z.string().min(1),
+    type: z.string().min(1),
+    label: z.string().min(1),
+    summary: z.string().default(""),
+    status: z.string().default("completed"),
+    agent_id: z.string().optional(),
+    agent_label: z.string().optional(),
+    input: z.record(z.string(), z.unknown()).default({}),
+    output: z.record(z.string(), z.unknown()).default({})
+  })
+  .strict();
+
+export const CodexResearchAngleSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    angle: z.string().min(1),
+    objective: z.string().min(1),
+    prompt: z.string().min(1)
+  })
+  .strict();
+
+export const CodexSourceSignalSchema = z
+  .object({
+    title: z.string().min(1),
+    url: z.string().default(""),
+    reason: z.string().min(1),
+    agent_label: z.string().default("")
+  })
+  .strict();
+
+export const CodexContentBriefSchema = z
+  .object({
+    title: z.string().min(1),
+    audience: z.string().min(1),
+    promise: z.string().min(1),
+    sections: z.array(z.string().min(1)).default([]),
+    questions_to_answer: z.array(z.string().min(1)).default([]),
+    citation_targets: z.array(z.string().min(1)).default([]),
+    content_rules: z.array(z.string().min(1)).default([]),
+    agent_findings: z.array(z.string().min(1)).default([])
+  })
+  .strict();
+
+export const CodexResearchTraceSchema = z
+  .object({
+    plan: z.array(CodexResearchAngleSchema).default([]),
+    events: z.array(CodexTraceEventSchema).default([]),
+    trusted_sources: z.array(CodexSourceSignalSchema).default([]),
+    ignored_sources: z.array(CodexSourceSignalSchema).default([]),
+    repeated_queries: z.array(z.string().min(1)).default([]),
+    missing_content_opportunities: z.array(z.string().min(1)).default([]),
+    summary: z.string().default("")
+  })
+  .strict();
+
 export type SeoContentTask = z.infer<typeof SeoContentTaskSchema>;
 export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
 export type RedditCompanyProfile = z.infer<typeof RedditCompanyProfileSchema>;
 export type RedditInvestigationSelectedThread = z.infer<typeof RedditInvestigationSelectedThreadSchema>;
 export type RedditInvestigationRejectedThread = z.infer<typeof RedditInvestigationRejectedThreadSchema>;
 export type RedditInvestigationTrace = z.infer<typeof RedditInvestigationTraceSchema>;
+export type CodexResearchExecutionMode = z.infer<typeof CodexResearchExecutionModeSchema>;
+export type CodexResearchStatus = z.infer<typeof CodexResearchStatusSchema>;
+export type CodexTraceEvent = z.infer<typeof CodexTraceEventSchema>;
+export type CodexResearchAngle = z.infer<typeof CodexResearchAngleSchema>;
+export type CodexSourceSignal = z.infer<typeof CodexSourceSignalSchema>;
+export type CodexContentBrief = z.infer<typeof CodexContentBriefSchema>;
+export type CodexResearchTrace = z.infer<typeof CodexResearchTraceSchema>;
 export type KeywordDiscoveryCandidate = z.infer<typeof KeywordDiscoveryCandidateSchema>;
 export type CompetitorIntelligencePlan = z.infer<typeof CompetitorIntelligencePlanSchema>;
 export type AgentSuggestedAction = z.infer<typeof AgentSuggestedActionSchema>;

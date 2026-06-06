@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Globe2, Languages, MapPin, Search, Settings, Sparkles } from "lucide-react";
+import { ArrowUpRight, BrainCircuit, Globe2, Languages, MapPin, Search, Settings, Sparkles } from "lucide-react";
 import type { Client } from "../../lib/database.types";
 import { createSupabaseAdmin } from "../../lib/supabase-admin";
 import { PeekabooLogo } from "../components/PeekabooLogo";
@@ -36,6 +36,10 @@ export default async function ClientsPage() {
           <ButtonLink href="/reddit" variant="secondary">
             <Search className="h-4 w-4" />
             Reddit
+          </ButtonLink>
+          <ButtonLink href="/codex" variant="secondary">
+            <BrainCircuit className="h-4 w-4" />
+            Codex
           </ButtonLink>
           <ButtonLink href="/settings" variant="secondary">
             <Settings className="h-4 w-4" />

@@ -18,6 +18,8 @@ export type ArticleDraftStatus = "draft" | "approved" | "rejected";
 export type KeywordResearchRunStatus = "queued" | "running" | "failed" | "completed";
 export type CompetitorIntelligenceRunStatus = "queued" | "running" | "failed" | "completed";
 export type RedditIntelligenceRunStatus = "queued" | "running" | "failed" | "completed";
+export type CodexResearchRunStatus = "queued" | "running" | "failed" | "completed";
+export type CodexResearchExecutionMode = "real_codex" | "virtual_fallback";
 export type CompetitorIntelligenceRunMode = "fetch_and_analyze" | "analyze_only" | "fetch_only";
 export type CompetitorRecommendationType = "gap" | "weak_overlap" | "existing_opportunity";
 export type CompetitorRecommendationStatus = "recommended" | "used_in_writer" | "dismissed";
@@ -257,4 +259,43 @@ export type RedditThread = {
   matched_icps: Json;
   metadata: Json;
   created_at: string;
+};
+
+export type CodexResearchRun = {
+  id: string;
+  reddit_thread_id: string | null;
+  profile_slug: string;
+  status: CodexResearchRunStatus;
+  execution_mode: CodexResearchExecutionMode;
+  current_stage: string | null;
+  trigger_run_id: string | null;
+  selected_reddit_thread: Json;
+  company_profile_snapshot: Json;
+  normalized_trace: Json;
+  content_brief: Json;
+  proposed_skill_diff: string;
+  summary: Json;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CodexSubagentRun = {
+  id: string;
+  run_id: string;
+  agent_id: string;
+  agent_label: string;
+  angle: string;
+  prompt: string;
+  status: CodexResearchRunStatus;
+  raw_jsonl: string;
+  normalized_events: Json;
+  final_answer: string;
+  trusted_sources: Json;
+  ignored_sources: Json;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 };

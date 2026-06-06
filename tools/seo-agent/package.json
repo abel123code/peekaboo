@@ -7,6 +7,9 @@
     "run": "tsx src/run-seo-content-workflow.ts",
     "run:sample": "tsx src/run-seo-content-workflow.ts inputs/sample-content-task.json",
     "run:reddit": "tsx src/run-reddit-investigation.ts",
+    "run:codex": "tsx src/run-codex-research.ts",
+    "test:codex": "tsx src/pipelines/codex-research/normalizer.test.ts",
+    "test:codex:run": "tsx src/pipelines/codex-research/research.test.ts",
     "check": "tsc --noEmit"
   },
   "engines": {
