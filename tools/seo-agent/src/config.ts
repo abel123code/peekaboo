@@ -7,21 +7,48 @@ export const rootDir = path.resolve(
   ".."
 );
 
+function uniquePaths(paths: string[]) {
+  return [...new Set(paths.map((candidate) => path.resolve(candidate)))];
+}
+
+function ancestorDirs(start: string, limit = 8) {
+  const dirs: string[] = [];
+  let current = path.resolve(start);
+  for (let index = 0; index < limit; index++) {
+    dirs.push(current);
+    const next = path.dirname(current);
+    if (next === current) break;
+    current = next;
+  }
+  return dirs;
+}
+
 export function loadEnv(): void {
-  const envPath = path.join(rootDir, ".env");
-  if (!fs.existsSync(envPath)) return;
+  const envPaths = uniquePaths([
+    path.join(rootDir, ".env"),
+    path.join(process.cwd(), ".env"),
+    path.join(process.cwd(), "..", "..", "tools", "seo-agent", ".env"),
+    ...ancestorDirs(process.cwd()).flatMap((dir) => [
+      path.join(dir, "tools", "seo-agent", ".env"),
+      path.join(dir, "apps", "web", ".env")
+    ])
+  ]);
 
-  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const separatorIndex = trimmed.indexOf("=");
-    if (separatorIndex === -1) continue;
+  for (const envPath of envPaths) {
+    if (!fs.existsSync(envPath)) continue;
 
-    const key = trimmed.slice(0, separatorIndex).trim();
-    const value = trimmed.slice(separatorIndex + 1).trim();
-    if (key && process.env[key] === undefined) {
-      process.env[key] = value;
+    const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex === -1) continue;
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      const value = trimmed.slice(separatorIndex + 1).trim();
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
     }
   }
 }

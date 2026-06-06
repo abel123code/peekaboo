@@ -105,7 +105,8 @@ type FinalJudgeOutput = {
   }>;
 };
 
-const REDDIT_PROFILE_PATH = path.join(rootDir, "inputs", "mr-plumber-sg.json");
+const REDDIT_PROFILE_FILE = "mr-plumber-sg.json";
+const REDDIT_PROFILE_PATH = path.join(rootDir, "inputs", REDDIT_PROFILE_FILE);
 
 const redditTools: OpenAIFunctionTool[] = [
   {
@@ -252,6 +253,53 @@ function traceRecord(value: Record<string, unknown>) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+async function fileExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ancestorDirs(start: string, limit = 8) {
+  const dirs: string[] = [];
+  let current = path.resolve(start);
+  for (let index = 0; index < limit; index++) {
+    dirs.push(current);
+    const next = path.dirname(current);
+    if (next === current) break;
+    current = next;
+  }
+  return dirs;
+}
+
+async function resolveRedditProfilePath(profilePath?: string) {
+  if (profilePath) return profilePath;
+
+  const candidates = [
+    REDDIT_PROFILE_PATH,
+    path.resolve(process.cwd(), "inputs", REDDIT_PROFILE_FILE),
+    path.resolve(process.cwd(), "tools", "seo-agent", "inputs", REDDIT_PROFILE_FILE),
+    path.resolve(process.cwd(), "..", "..", "tools", "seo-agent", "inputs", REDDIT_PROFILE_FILE),
+    ...ancestorDirs(process.cwd()).flatMap((dir) => [
+      path.join(dir, "inputs", REDDIT_PROFILE_FILE),
+      path.join(dir, "tools", "seo-agent", "inputs", REDDIT_PROFILE_FILE)
+    ]),
+    ...ancestorDirs(rootDir).flatMap((dir) => [
+      path.join(dir, "inputs", REDDIT_PROFILE_FILE),
+      path.join(dir, "tools", "seo-agent", "inputs", REDDIT_PROFILE_FILE)
+    ])
+  ];
+  const uniqueCandidates = [...new Set(candidates.map((candidate) => path.resolve(candidate)))];
+
+  for (const candidate of uniqueCandidates) {
+    if (await fileExists(candidate)) return candidate;
+  }
+
+  throw new Error(`Could not locate ${REDDIT_PROFILE_FILE}. Checked: ${uniqueCandidates.join(", ")}`);
 }
 
 function compactThread(thread: RedditThreadCandidate | RedditFetchedThread) {
@@ -1030,8 +1078,9 @@ async function judgeFinalThreads(profile: RedditCompanyProfile, state: Investiga
   await emitTrace(state, options);
 }
 
-export async function loadRedditCompanyProfile(profilePath = REDDIT_PROFILE_PATH) {
-  const raw = JSON.parse(await fs.readFile(profilePath, "utf8")) as unknown;
+export async function loadRedditCompanyProfile(profilePath?: string) {
+  const resolvedProfilePath = await resolveRedditProfilePath(profilePath);
+  const raw = JSON.parse(await fs.readFile(resolvedProfilePath, "utf8")) as unknown;
   return RedditCompanyProfileSchema.parse(raw);
 }
 
