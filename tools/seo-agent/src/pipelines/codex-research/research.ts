@@ -265,7 +265,7 @@ function eventLooksLikeAnswer(value: string) {
 }
 
 async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEvent: (event: CodexTraceEvent) => Promise<void> | void): Promise<CodexSubagentResult> {
-  const command = process.env.CODEX_EXEC_COMMAND || "codex";
+  const command = process.env.CODEX_EXEC_COMMAND || (process.platform === "win32" ? "codex.cmd" : "codex");
   const args = ["exec", "--json", "--ephemeral", "--sandbox", "read-only", angle.prompt];
   const timeoutMs = Number(process.env.CODEX_EXEC_TIMEOUT_MS || 180_000);
   let rawJsonl = "";
@@ -275,7 +275,7 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      shell: process.platform === "win32",
+      shell: false,
       env: process.env
     });
     let buffer = "";

@@ -89,6 +89,7 @@ export type CodexLane = {
   angle: string;
   prompt: string;
   status: string;
+  events: TraceRecord[];
   eventCount: number;
   latestEvent: TraceRecord | null;
   finalAnswer: string;
@@ -292,6 +293,7 @@ function lanesFromTrace(trace: CodexTrace, subagents: CodexSubagentSummary[]): C
       angle: agent.angle,
       prompt: agent.prompt,
       status: agent.status,
+      events,
       eventCount: events.length,
       latestEvent: [...events].reverse()[0] || null,
       finalAnswer: agent.final_answer,
@@ -310,6 +312,7 @@ function lanesFromTrace(trace: CodexTrace, subagents: CodexSubagentSummary[]): C
         angle: text(plan.angle, "Research angle"),
         prompt: text(plan.prompt, ""),
         status: events.length ? text(events.at(-1)?.status, "running") : "queued",
+        events,
         eventCount: events.length,
         latestEvent: events.at(-1) || null,
         finalAnswer: "",
