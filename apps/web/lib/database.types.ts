@@ -17,6 +17,7 @@ export type WorkflowRunStatus = "queued" | "running" | "failed" | "completed";
 export type ArticleDraftStatus = "draft" | "approved" | "rejected";
 export type KeywordResearchRunStatus = "queued" | "running" | "failed" | "completed";
 export type CompetitorIntelligenceRunStatus = "queued" | "running" | "failed" | "completed";
+export type RedditIntelligenceRunStatus = "queued" | "running" | "failed" | "completed";
 export type CompetitorIntelligenceRunMode = "fetch_and_analyze" | "analyze_only" | "fetch_only";
 export type CompetitorRecommendationType = "gap" | "weak_overlap" | "existing_opportunity";
 export type CompetitorRecommendationStatus = "recommended" | "used_in_writer" | "dismissed";
@@ -216,6 +217,44 @@ export type AgentMessage = {
   client_id: string;
   role: AgentMessageRole;
   content: string;
+  metadata: Json;
+  created_at: string;
+};
+
+export type RedditIntelligenceRun = {
+  id: string;
+  profile_slug: string;
+  profile_name: string | null;
+  status: RedditIntelligenceRunStatus;
+  current_stage: string | null;
+  trigger_run_id: string | null;
+  company_profile_snapshot: Json;
+  investigation_trace: Json;
+  summary: Json;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RedditThread = {
+  id: string;
+  run_id: string;
+  reddit_id: string;
+  subreddit: string;
+  title: string;
+  url: string;
+  reddit_score: number;
+  comment_count: number;
+  created_utc: string | null;
+  relevance_score: number;
+  urgency_score: number;
+  commercial_intent_score: number;
+  why_relevant: string;
+  thread_content: string;
+  matched_services: Json;
+  matched_icps: Json;
   metadata: Json;
   created_at: string;
 };

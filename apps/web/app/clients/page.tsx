@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Globe2, Languages, MapPin, Settings, Sparkles } from "lucide-react";
+import { ArrowUpRight, Globe2, Languages, MapPin, Search, Settings, Sparkles } from "lucide-react";
 import type { Client } from "../../lib/database.types";
 import { createSupabaseAdmin } from "../../lib/supabase-admin";
 import { PeekabooLogo } from "../components/PeekabooLogo";
@@ -32,10 +32,16 @@ export default async function ClientsPage() {
     <>
       <div className="mb-8 flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white px-5 py-4 shadow-sm">
         <PeekabooLogo size="lg" />
-        <ButtonLink href="/settings" variant="secondary">
-          <Settings className="h-4 w-4" />
-          Settings
-        </ButtonLink>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href="/reddit" variant="secondary">
+            <Search className="h-4 w-4" />
+            Reddit
+          </ButtonLink>
+          <ButtonLink href="/settings" variant="secondary">
+            <Settings className="h-4 w-4" />
+            Settings
+          </ButtonLink>
+        </div>
       </div>
 
       <div className="mb-7 grid grid-cols-[1fr_auto] items-end gap-6 max-md:grid-cols-1">

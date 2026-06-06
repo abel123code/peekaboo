@@ -6,6 +6,7 @@
   "scripts": {
     "run": "tsx src/run-seo-content-workflow.ts",
     "run:sample": "tsx src/run-seo-content-workflow.ts inputs/sample-content-task.json",
+    "run:reddit": "tsx src/run-reddit-investigation.ts",
     "check": "tsc --noEmit"
   },
   "engines": {

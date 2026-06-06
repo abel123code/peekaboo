@@ -334,8 +334,160 @@ export const SeoReviewSchema = z.object({
     .optional()
 });
 
+export const RedditCompanyProfileSchema = z
+  .object({
+    $schema_version: z.literal("peekaboo.company-profile/1"),
+    agent_role: z.string().min(1),
+    company: z
+      .object({
+        name: z.string().min(1),
+        url: z.string().url(),
+        tagline: z.string().min(1),
+        description: z.string().min(1),
+        founded_estimate: z.string().min(1),
+        geography: z
+          .object({
+            country: z.string().min(1),
+            coverage: z.string().min(1)
+          })
+          .strict(),
+        contact: z
+          .object({
+            primary_channel: z.string().min(1),
+            whatsapp: z.string().min(1),
+            hours: z.string().min(1)
+          })
+          .strict(),
+        credentials: z.array(z.string().min(1)).default([])
+      })
+      .strict(),
+    industry: z
+      .object({
+        primary_category: z.string().min(1),
+        sub_categories: z.array(z.string().min(1)).default([]),
+        client_segments: z.array(z.string().min(1)).default([])
+      })
+      .strict(),
+    services: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            name: z.string().min(1),
+            what_it_is: z.string().min(1),
+            trigger_scenario: z.string().min(1),
+            urgency: z.enum(["emergency", "high", "medium", "low"]),
+            price_from_sgd: z.number().nullable(),
+            regulatory_note: z.string().optional()
+          })
+          .strict()
+      )
+      .default([]),
+    icps: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            demographics: z.string().min(1),
+            trigger_event: z.string().min(1),
+            emotional_state: z.string().min(1),
+            decision_window: z.string().min(1),
+            search_behaviour: z.array(z.string().min(1)).default([]),
+            decision_drivers: z.array(z.string().min(1)).default([])
+          })
+          .strict()
+      )
+      .default([]),
+    hair_on_fire_problems: z
+      .array(
+        z
+          .object({
+            problem: z.string().min(1),
+            user_state: z.string().min(1),
+            search_intent: z.array(z.string().min(1)).default([]),
+            where_they_ask: z.array(z.string().min(1)).default([])
+          })
+          .strict()
+      )
+      .default([]),
+    competitor_landscape: z
+      .object({
+        direct_competitors: z.array(z.string().min(1)).default([]),
+        indirect_competitors: z.array(z.string().min(1)).default([]),
+        common_aggregator_listings: z.array(z.string().min(1)).default([])
+      })
+      .strict(),
+    agent_optimization_targets: z
+      .object({
+        we_want_agents_to_recommend_us_when: z.array(z.string().min(1)).default([]),
+        trust_signals_we_can_lean_on: z.array(z.string().min(1)).default([]),
+        where_we_currently_lose: z.array(z.string().min(1)).default([])
+      })
+      .strict(),
+    research_hints_for_peekaboo_agent: z
+      .object({
+        primary_subreddits: z.array(z.string().min(1)).default([]),
+        secondary_subreddits: z.array(z.string().min(1)).default([]),
+        high_signal_search_queries: z.array(z.string().min(1)).default([]),
+        high_value_thread_patterns: z.array(z.string().min(1)).default([]),
+        thread_relevance_filters: z
+          .object({
+            minimum_score: z.number().default(0),
+            include_keywords: z.array(z.string().min(1)).default([]),
+            exclude_keywords: z.array(z.string().min(1)).default([]),
+            geography_must_match: z.string().min(1)
+          })
+          .strict(),
+        agent_simulation_prompts: z.array(z.string().min(1)).default([])
+      })
+      .strict()
+  })
+  .strict();
+
+export const RedditInvestigationSelectedThreadSchema = z
+  .object({
+    reddit_id: z.string().min(1),
+    subreddit: z.string().min(1),
+    title: z.string().min(1),
+    url: z.string().url(),
+    relevance_score: z.number().min(0).max(100),
+    urgency_score: z.number().min(0).max(100),
+    commercial_intent_score: z.number().min(0).max(100),
+    why_relevant: z.string().min(1),
+    matched_services: z.array(z.string().min(1)).default([]),
+    matched_icps: z.array(z.string().min(1)).default([]),
+    thread_content: z.string().default("")
+  })
+  .strict();
+
+export const RedditInvestigationRejectedThreadSchema = z
+  .object({
+    reddit_id: z.string().min(1),
+    subreddit: z.string().min(1),
+    title: z.string().min(1),
+    reason: z.string().min(1)
+  })
+  .strict();
+
+export const RedditInvestigationTraceSchema = z
+  .object({
+    plan: z.array(z.record(z.string(), z.unknown())).default([]),
+    harness_events: z.array(z.record(z.string(), z.unknown())).default([]),
+    tool_calls: z.array(z.record(z.string(), z.unknown())).default([]),
+    decisions: z.array(z.record(z.string(), z.unknown())).default([]),
+    rejected_threads: z.array(RedditInvestigationRejectedThreadSchema).default([]),
+    selected_threads: z.array(RedditInvestigationSelectedThreadSchema).default([]),
+    summary: z.string().default("")
+  })
+  .strict();
+
 export type SeoContentTask = z.infer<typeof SeoContentTaskSchema>;
 export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
+export type RedditCompanyProfile = z.infer<typeof RedditCompanyProfileSchema>;
+export type RedditInvestigationSelectedThread = z.infer<typeof RedditInvestigationSelectedThreadSchema>;
+export type RedditInvestigationRejectedThread = z.infer<typeof RedditInvestigationRejectedThreadSchema>;
+export type RedditInvestigationTrace = z.infer<typeof RedditInvestigationTraceSchema>;
 export type KeywordDiscoveryCandidate = z.infer<typeof KeywordDiscoveryCandidateSchema>;
 export type CompetitorIntelligencePlan = z.infer<typeof CompetitorIntelligencePlanSchema>;
 export type AgentSuggestedAction = z.infer<typeof AgentSuggestedActionSchema>;
