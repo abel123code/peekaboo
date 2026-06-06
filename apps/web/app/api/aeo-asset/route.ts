@@ -131,5 +131,5 @@ export async function POST(request: Request) {
       .eq("id", run.id);
   }
 
-  return NextResponse.redirect(new URL(`/codex?runId=${codexRunId}`, request.url), 303);
+  return NextResponse.redirect(new URL(`/writer/${run.id}`, request.url), 303);
 }
