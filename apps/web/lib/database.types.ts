@@ -20,6 +20,7 @@ export type CompetitorIntelligenceRunStatus = "queued" | "running" | "failed" | 
 export type RedditIntelligenceRunStatus = "queued" | "running" | "failed" | "completed";
 export type CodexResearchRunStatus = "queued" | "running" | "failed" | "completed";
 export type CodexResearchExecutionMode = "real_codex" | "virtual_fallback";
+export type AeoAssetRunStatus = "queued" | "running" | "failed" | "completed";
 export type CompetitorIntelligenceRunMode = "fetch_and_analyze" | "analyze_only" | "fetch_only";
 export type CompetitorRecommendationType = "gap" | "weak_overlap" | "existing_opportunity";
 export type CompetitorRecommendationStatus = "recommended" | "used_in_writer" | "dismissed";
@@ -296,6 +297,25 @@ export type CodexSubagentRun = {
   trusted_sources: Json;
   ignored_sources: Json;
   error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AeoAssetRun = {
+  id: string;
+  codex_run_id: string;
+  status: AeoAssetRunStatus;
+  current_stage: string | null;
+  trigger_run_id: string | null;
+  idea_index: number;
+  selected_idea: Json;
+  source_pack: Json;
+  generated_asset: Json;
+  review_trace: Json;
+  summary: Json;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 };

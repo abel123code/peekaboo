@@ -14,6 +14,7 @@ import {
   Link2,
   Loader2,
   Play,
+  Rows3,
   Search,
   Sparkles,
   Terminal,
@@ -37,7 +38,9 @@ type CodexMissionControlProps = {
 export function CodexMissionControl({ initialData, setupError, runId }: CodexMissionControlProps) {
   const [data, setData] = useState(initialData);
   const [pollError, setPollError] = useState<string | null>(null);
-  const isActive = Boolean(data?.demo.isActive);
+  const latestAssetRun = data?.latestAssetRun || null;
+  const isAssetActive = latestAssetRun?.status === "queued" || latestAssetRun?.status === "running";
+  const isActive = Boolean(data?.demo.isActive || isAssetActive);
 
   useEffect(() => {
     if (setupError || !isActive) return;
@@ -73,6 +76,7 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
   const rawEvents = data?.trace.events.slice(-80).reverse() || [];
   const firstThread = data?.redditThreads[0] || null;
   const contentIdeas = buildContentIdeas(contentBrief, selectedThread);
+  const activityLabel = isAssetActive ? "live writer run" : demo?.isActive ? "live Codex run" : latestRun?.status || "ready";
 
   return (
     <div className="-mx-1 pb-8">
@@ -87,7 +91,7 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
               <div>
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                   <span className={isActive ? "h-2 w-2 rounded-full bg-emerald-500 motion-safe:animate-pulse" : "h-2 w-2 rounded-full bg-zinc-300"} />
-                  {isActive ? "live Codex run" : latestRun?.status || "ready"}
+                  {activityLabel}
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Codex mission control</h1>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-600">
@@ -111,7 +115,9 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
             </div>
           </section>
 
-          <ContentIdeaChooser ideas={contentIdeas} isRunning={isActive} />
+          <ContentIdeaChooser ideas={contentIdeas} codexRunId={latestRun?.id || ""} assetRun={latestAssetRun} isRunning={Boolean(demo?.isActive)} isAssetRunning={isAssetActive} />
+
+          {latestRun ? <AeoAssetWriter assetRun={latestAssetRun} isRunning={isAssetActive} /> : null}
 
           {latestRun ? (
             <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -473,6 +479,7 @@ function NowRunning({ action }: { action: NonNullable<CodexLatestPayload["demo"]
 
 type ContentIdea = {
   id: string;
+  index: number;
   title: string;
   angle: string;
   targetQuery: string;
@@ -487,6 +494,7 @@ function buildContentIdeas(brief: TraceRecord, _selectedThread: TraceRecord): Co
       const record = asRecord(idea);
       return {
         id: `idea-${index + 1}`,
+        index,
         title: text(record.title, ""),
         angle: text(record.angle, ""),
         targetQuery: text(record.target_query, ""),
@@ -583,9 +591,22 @@ function ToolCallsPanel({ events }: { events: TraceRecord[] }) {
   );
 }
 
-function ContentIdeaChooser({ ideas, isRunning }: { ideas: ContentIdea[]; isRunning: boolean }) {
+function ContentIdeaChooser({
+  ideas,
+  codexRunId,
+  assetRun,
+  isRunning,
+  isAssetRunning
+}: {
+  ideas: ContentIdea[];
+  codexRunId: string;
+  assetRun: CodexLatestPayload["latestAssetRun"];
+  isRunning: boolean;
+  isAssetRunning: boolean;
+}) {
   const [selectedId, setSelectedId] = useState("");
   const selected = ideas.find((idea) => idea.id === selectedId) || ideas[0] || null;
+  const canGenerate = Boolean(codexRunId && selected && !isRunning && !isAssetRunning);
 
   useEffect(() => {
     if (!selectedId && ideas[0]) setSelectedId(ideas[0].id);
@@ -639,10 +660,315 @@ function ContentIdeaChooser({ ideas, isRunning }: { ideas: ContentIdea[]; isRunn
               ))}
             </div>
           ) : null}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-white px-3 py-3">
+            <div>
+              <div className="text-sm font-semibold text-zinc-950">Ready for final writing</div>
+              <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+                Generate the AEO article bundle from this selected idea, source pack, and Reddit case.
+              </p>
+            </div>
+            <form action="/api/aeo-asset" method="post">
+              <input type="hidden" name="codexRunId" value={codexRunId} />
+              <input type="hidden" name="ideaIndex" value={selected.index} />
+              <Button type="submit" disabled={!canGenerate} className="bg-emerald-600 hover:bg-emerald-700">
+                {isAssetRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                {isAssetRunning ? "Writing..." : assetRun?.status === "completed" ? "Generate Again" : "Generate AEO Article"}
+              </Button>
+            </form>
+          </div>
         </div>
       ) : null}
     </section>
   );
+}
+
+function AeoAssetWriter({
+  assetRun,
+  isRunning
+}: {
+  assetRun: CodexLatestPayload["latestAssetRun"];
+  isRunning: boolean;
+}) {
+  if (!assetRun) return null;
+  const generatedAsset = asRecord(assetRun.generated_asset);
+  const files = asRecord(generatedAsset.files);
+  const meta = asRecord(generatedAsset.meta);
+  const reviewTrace = Array.isArray(assetRun.review_trace) ? assetRun.review_trace.map(asRecord) : [];
+  const article = text(files.article_md, "");
+  const tabs = [
+    { id: "preview", label: "Preview", value: article },
+    { id: "article", label: "article.md", value: article },
+    { id: "llms", label: "llms.txt", value: text(files.llms_txt, "") },
+    { id: "robots", label: "robots.txt", value: text(files.robots_txt, "") },
+    { id: "schema", label: "faq.schema.json", value: JSON.stringify(asRecord(files.faq_schema_json), null, 2) },
+    { id: "meta", label: "meta.json", value: JSON.stringify(asRecord(files.meta_json || meta), null, 2) }
+  ] as const;
+
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PanelHeader title="AEO article writer" subtitle="Final writing pipeline and preview-only asset bundle." icon={<Rows3 className="h-4 w-4" />} />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={assetRun.status} />
+          {isRunning ? <Loader2 className="h-4 w-4 animate-spin text-emerald-600" /> : null}
+        </div>
+      </div>
+      <AeoAssetStageRail run={assetRun} />
+
+      {assetRun.error ? (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{assetRun.error}</div>
+      ) : null}
+
+      {assetRun.status === "completed" && article ? (
+        <AssetTabs tabs={tabs} meta={meta} reviewTrace={reviewTrace} />
+      ) : (
+        <div className="mt-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-5 text-sm text-zinc-500">
+          {isRunning ? `Current stage: ${assetRun.current_stage || "writing"}` : "The generated article files will appear here once the writer finishes."}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AeoAssetStageRail({ run }: { run: NonNullable<CodexLatestPayload["latestAssetRun"]> }) {
+  const current = text(run.current_stage, run.status).toLowerCase();
+  const activeIndex =
+    run.status === "completed"
+      ? 4
+      : run.status === "failed"
+      ? Math.max(0, ["idea", "draft", "review", "building", "preview"].findIndex((label) => current.includes(label)))
+      : current.includes("preview")
+      ? 4
+      : current.includes("building")
+      ? 3
+      : current.includes("review")
+      ? 2
+      : current.includes("draft")
+      ? 1
+      : 0;
+  const stages = ["Idea locked", "Drafting article", "Reviewing AEO checklist", "Building files", "Preview ready"];
+
+  return (
+    <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4">
+      <div className="grid min-w-[760px] grid-cols-5 gap-2">
+        {stages.map((stage, index) => {
+          const completed = run.status === "completed" || index < activeIndex;
+          const active = run.status !== "completed" && index === activeIndex;
+          const failed = run.status === "failed" && index === activeIndex;
+          return (
+            <div
+              key={stage}
+              className={
+                failed
+                  ? "rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+                  : active
+                  ? "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                  : completed
+                  ? "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2"
+                  : "rounded-lg border border-zinc-200 bg-white px-3 py-2"
+              }
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-zinc-500">{index + 1}</span>
+                {failed ? (
+                  <XCircle className="h-4 w-4 text-red-600" />
+                ) : completed ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                ) : active ? (
+                  <Clock3 className="h-4 w-4 text-amber-600" />
+                ) : (
+                  <Circle className="h-4 w-4 text-zinc-400" />
+                )}
+              </div>
+              <div className={active ? "mt-2 text-sm font-semibold text-amber-700" : "mt-2 text-sm font-semibold text-zinc-800"}>{stage}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AssetTabs({
+  tabs,
+  meta,
+  reviewTrace
+}: {
+  tabs: ReadonlyArray<{ id: string; label: string; value: string }>;
+  meta: TraceRecord;
+  reviewTrace: TraceRecord[];
+}) {
+  const [activeTab, setActiveTab] = useState("preview");
+  const active = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const checklist = asRecord(meta.checklist);
+  const passed = Object.values(checklist).filter(Boolean).length;
+  const total = Object.keys(checklist).length || 5;
+
+  return (
+    <div className="mt-4 grid gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Preview ready</div>
+          <div className="mt-1 text-sm font-medium text-zinc-800">{text(meta.title, "Generated AEO article")}</div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-medium text-zinc-600">
+          <span className="rounded-md border border-emerald-200 bg-white px-2 py-1">{passed}/{total} AEO checks</span>
+          <span className="rounded-md border border-emerald-200 bg-white px-2 py-1">{number(meta.token_estimate, 0)} tokens est.</span>
+          <span className="rounded-md border border-emerald-200 bg-white px-2 py-1">{reviewTrace.length} review pass{reviewTrace.length === 1 ? "" : "es"}</span>
+        </div>
+      </div>
+      <div className="rounded-xl border border-zinc-200 bg-white">
+        <div className="flex flex-wrap gap-1 border-b border-zinc-200 px-3 py-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={
+                activeTab === tab.id
+                  ? "cursor-pointer rounded-md bg-zinc-950 px-3 py-1.5 text-sm font-medium text-white"
+                  : "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-[720px] overflow-auto p-4">
+          {active?.id === "preview" ? (
+            <article className="article-preview rounded-xl border border-zinc-100 bg-zinc-50 px-5 py-4">
+              <MarkdownPreview content={active.value} />
+            </article>
+          ) : (
+            <pre className="whitespace-pre-wrap break-words rounded-xl border border-zinc-200 bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-100">
+              {active?.value || "No content generated."}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderInlineMarkdown(value: string) {
+  const parts: ReactNode[] = [];
+  const pattern = /(\*\*([^*]+)\*\*)|(\[([^\]]+)\]\(([^)]+)\))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value))) {
+    if (match.index > lastIndex) parts.push(value.slice(lastIndex, match.index));
+    if (match[2]) {
+      parts.push(<strong key={`strong-${match.index}`}>{match[2]}</strong>);
+    } else if (match[4] && match[5]) {
+      parts.push(
+        <a key={`link-${match.index}`} href={match[5]} target="_blank" rel="noreferrer" className="font-medium text-emerald-700 hover:underline">
+          {match[4]}
+        </a>
+      );
+    }
+    lastIndex = pattern.lastIndex;
+  }
+  if (lastIndex < value.length) parts.push(value.slice(lastIndex));
+  return parts;
+}
+
+function parseMarkdownTable(lines: string[], startIndex: number) {
+  const rows: string[][] = [];
+  let index = startIndex;
+  while (index < lines.length && /^\s*\|.*\|\s*$/.test(lines[index] || "")) {
+    const line = lines[index] || "";
+    if (!/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)) {
+      rows.push(
+        line
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((cell) => cell.trim())
+      );
+    }
+    index++;
+  }
+  return { rows, nextIndex: index };
+}
+
+function MarkdownPreview({ content }: { content: string }) {
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index]?.trimEnd() || "";
+    if (!line.trim()) {
+      index++;
+      continue;
+    }
+
+    if (/^#{1,3}\s+/.test(line)) {
+      const level = line.match(/^#+/)?.[0].length || 1;
+      const label = line.replace(/^#{1,3}\s+/, "");
+      if (level === 1) blocks.push(<h1 key={`h-${index}`} className="text-2xl font-semibold tracking-tight text-zinc-950">{renderInlineMarkdown(label)}</h1>);
+      else if (level === 2) blocks.push(<h2 key={`h-${index}`} className="mt-6 text-lg font-semibold text-zinc-950">{renderInlineMarkdown(label)}</h2>);
+      else blocks.push(<h3 key={`h-${index}`} className="mt-4 text-base font-semibold text-zinc-900">{renderInlineMarkdown(label)}</h3>);
+      index++;
+      continue;
+    }
+
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|.*\|\s*$/.test(lines[index + 1] || "")) {
+      const { rows, nextIndex } = parseMarkdownTable(lines, index);
+      const [head, ...body] = rows;
+      blocks.push(
+        <div key={`table-${index}`} className="my-4 overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+          <table className="min-w-full text-left text-sm">
+            {head ? (
+              <thead className="bg-zinc-100 text-xs uppercase tracking-[0.08em] text-zinc-500">
+                <tr>{head.map((cell) => <th key={cell} className="px-3 py-2 font-semibold">{renderInlineMarkdown(cell)}</th>)}</tr>
+              </thead>
+            ) : null}
+            <tbody className="divide-y divide-zinc-100">
+              {body.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className="px-3 py-2 align-top text-zinc-700">{renderInlineMarkdown(cell)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      index = nextIndex;
+      continue;
+    }
+
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index] || "")) {
+        items.push((lines[index] || "").replace(/^\s*[-*]\s+/, ""));
+        index++;
+      }
+      blocks.push(
+        <ul key={`ul-${index}`} className="my-3 grid gap-1.5 pl-5 text-sm leading-6 text-zinc-700">
+          {items.map((item) => <li key={item} className="list-disc">{renderInlineMarkdown(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    const paragraph = [line.trim()];
+    index++;
+    while (
+      index < lines.length &&
+      lines[index]?.trim() &&
+      !/^#{1,3}\s+/.test(lines[index] || "") &&
+      !/^\s*[-*]\s+/.test(lines[index] || "") &&
+      !/^\s*\|.*\|\s*$/.test(lines[index] || "")
+    ) {
+      paragraph.push((lines[index] || "").trim());
+      index++;
+    }
+    blocks.push(<p key={`p-${index}`} className="my-3 text-sm leading-7 text-zinc-700">{renderInlineMarkdown(paragraph.join(" "))}</p>);
+  }
+
+  return <div className="mx-auto max-w-4xl">{blocks}</div>;
 }
 
 function DemoStory({ demo }: { demo: NonNullable<CodexLatestPayload["demo"]> }) {

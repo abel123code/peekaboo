@@ -1,4 +1,4 @@
-import type { CodexResearchRun, CodexSubagentRun, Json, RedditThread } from "./database.types";
+import type { AeoAssetRun, CodexResearchRun, CodexSubagentRun, Json, RedditThread } from "./database.types";
 
 export type TraceRecord = Record<string, unknown>;
 
@@ -46,6 +46,26 @@ export type CodexSubagentSummary = Pick<
   | "trusted_sources"
   | "ignored_sources"
   | "error"
+  | "created_at"
+  | "updated_at"
+>;
+
+export type AeoAssetRunSummary = Pick<
+  AeoAssetRun,
+  | "id"
+  | "codex_run_id"
+  | "status"
+  | "current_stage"
+  | "trigger_run_id"
+  | "idea_index"
+  | "selected_idea"
+  | "source_pack"
+  | "generated_asset"
+  | "review_trace"
+  | "summary"
+  | "error"
+  | "started_at"
+  | "completed_at"
   | "created_at"
   | "updated_at"
 >;
@@ -121,6 +141,8 @@ export type CodexLatestPayload = {
   runs: CodexRunSummary[];
   latestRun: CodexRunSummary | null;
   subagents: CodexSubagentSummary[];
+  assetRuns: AeoAssetRunSummary[];
+  latestAssetRun: AeoAssetRunSummary | null;
   redditThreads: RedditThreadChoice[];
   trace: CodexTrace;
   demo: CodexDemoModel;
@@ -207,6 +229,27 @@ export function toSubagentSummary(row: CodexSubagentRun): CodexSubagentSummary {
     trusted_sources: row.trusted_sources,
     ignored_sources: row.ignored_sources,
     error: row.error,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+export function toAeoAssetRunSummary(row: AeoAssetRun): AeoAssetRunSummary {
+  return {
+    id: row.id,
+    codex_run_id: row.codex_run_id,
+    status: row.status,
+    current_stage: row.current_stage,
+    trigger_run_id: row.trigger_run_id,
+    idea_index: row.idea_index,
+    selected_idea: row.selected_idea,
+    source_pack: row.source_pack,
+    generated_asset: row.generated_asset,
+    review_trace: row.review_trace,
+    summary: row.summary,
+    error: row.error,
+    started_at: row.started_at,
+    completed_at: row.completed_at,
     created_at: row.created_at,
     updated_at: row.updated_at
   };

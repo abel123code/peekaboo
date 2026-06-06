@@ -1,11 +1,16 @@
 export function SetupNotice({ error }: { error: string }) {
   const missingRedditTables = error.includes("reddit_intelligence_runs") || error.includes("reddit_threads");
   const missingCodexTables = error.includes("codex_research_runs") || error.includes("codex_subagent_runs");
+  const missingAeoAssetTables = error.includes("aeo_asset_runs");
 
   return (
     <div className="notice">
       <strong>Supabase is not ready.</strong>
-      {missingCodexTables ? (
+      {missingAeoAssetTables ? (
+        <p>
+          Run <code>apps/web/supabase/migrations/011_aeo_asset_runs.sql</code> in Supabase, then refresh the schema cache.
+        </p>
+      ) : missingCodexTables ? (
         <p>
           Run <code>apps/web/supabase/migrations/010_codex_research.sql</code> in Supabase, then refresh the schema cache.
         </p>
