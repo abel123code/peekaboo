@@ -60,9 +60,16 @@ export function RedditHarnessDemo({ initialData, setupError }: RedditHarnessDemo
 
   const demo = data?.demo;
   const latestRun = data?.latestRun || null;
+  const isCompleted = latestRun?.status === "completed";
+  const isFailed = latestRun?.status === "failed";
   const summary = asRecord(latestRun?.summary);
-  const selectedPreview = demo?.selected.slice(0, 5) || [];
-  const rejectedPreview = demo?.rejected.slice(0, 5) || [];
+  const selectedItems = demo?.selected || [];
+  const rejectedItems = demo?.rejected || [];
+  const selectedPreview = selectedItems.slice(0, isCompleted ? 4 : 3);
+  const rejectedPreview = rejectedItems.slice(0, isCompleted ? 3 : 2);
+  const rankedThreads = [...(data?.threads || [])].sort((left, right) => right.relevance_score - left.relevance_score);
+  const featuredThread = rankedThreads[0] || null;
+  const otherThreads = rankedThreads.slice(1, 8);
   const recentRawEvents = data?.trace.harness_events.slice(-40).reverse() || [];
 
   return (
@@ -98,24 +105,39 @@ export function RedditHarnessDemo({ initialData, setupError }: RedditHarnessDemo
               </div>
             </div>
 
-            {demo ? (
+            {demo && latestRun ? (
               <div className="grid gap-5 p-5">
                 <PhaseRail phases={demo.phases} />
-                <NowRunningPanel action={demo.currentAction} phaseNumber={demo.currentPhaseIndex + 1} />
 
-                <div className="grid grid-cols-[1fr_1fr] gap-4 max-lg:grid-cols-1">
-                  <SearchMapPanel searches={demo.searchMap.slice(-10).reverse()} />
-                  <EvidenceQueuePanel evidence={demo.evidenceQueue.slice(-8).reverse()} />
-                </div>
-
-                <DecisionBoard selected={selectedPreview} rejected={rejectedPreview} />
+                {isFailed ? (
+                  <>
+                    <FailurePanel action={demo.currentAction} error={latestRun.error} />
+                    <DecisionBoard selected={selectedPreview} rejected={rejectedPreview} selectedTotal={selectedItems.length} rejectedTotal={rejectedItems.length} />
+                  </>
+                ) : isCompleted ? (
+                  <>
+                    <DecisionBoard selected={selectedPreview} rejected={rejectedPreview} selectedTotal={selectedItems.length} rejectedTotal={rejectedItems.length} />
+                    {featuredThread ? <FeaturedSignalThread thread={featuredThread} /> : <EmptyPanel text="No high-value signal thread was selected." />}
+                    {otherThreads.length ? <OtherSignalThreads threads={otherThreads} /> : null}
+                  </>
+                ) : (
+                  <>
+                    <NowRunningPanel action={demo.currentAction} phaseNumber={demo.currentPhaseIndex + 1} />
+                    <LiveInvestigationPreview searches={demo.searchMap.slice(-3).reverse()} evidence={demo.evidenceQueue.slice(-3).reverse()} />
+                    <DecisionBoard selected={selectedPreview} rejected={rejectedPreview} selectedTotal={selectedItems.length} rejectedTotal={rejectedItems.length} />
+                  </>
+                )}
               </div>
             ) : (
-              <div className="p-5 text-sm text-zinc-600">No Reddit investigation has been run yet.</div>
+              <EmptyRedditShell phases={demo?.phases || []} />
             )}
           </section>
 
-          {demo ? (
+          {demo && latestRun ? (
+            <InvestigationDetails searches={demo.searchMap.slice(-10).reverse()} evidence={demo.evidenceQueue.slice(-8).reverse()} />
+          ) : null}
+
+          {demo && latestRun ? (
             <section className="grid grid-cols-5 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <Metric label="Searches" value={demo.counts.searches} />
               <Metric label="Fetched" value={demo.counts.fetched} />
@@ -125,9 +147,7 @@ export function RedditHarnessDemo({ initialData, setupError }: RedditHarnessDemo
             </section>
           ) : null}
 
-          {data?.threads.length ? <FinalThreads threads={data.threads} /> : null}
-
-          {data ? <RawTraceDrawer eventCount={demo?.counts.events || 0} events={recentRawEvents} /> : null}
+          {data && latestRun ? <RawTraceDrawer eventCount={demo?.counts.events || 0} events={recentRawEvents} /> : null}
 
           {pollError ? (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Live polling error: {pollError}</div>
@@ -262,6 +282,139 @@ function NowRunningPanel({ action, phaseNumber }: { action: NonNullable<RedditLa
   );
 }
 
+function FailurePanel({
+  action,
+  error
+}: {
+  action: NonNullable<RedditLatestPayload["demo"]>["currentAction"];
+  error: string | null;
+}) {
+  return (
+    <section className="rounded-xl border border-red-200 bg-red-50 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <PanelHeader title="Run failed" subtitle="The harness stopped here. The trace below is kept for debugging." />
+        <Badge variant="danger">{action.tool}</Badge>
+      </div>
+      <div className="rounded-lg border border-red-200 bg-white p-4 font-mono text-sm leading-6 text-red-900">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-red-500">{action.title}</div>
+        <pre className="whitespace-pre-wrap break-words">{error || action.summary || "The investigation failed without a recorded error."}</pre>
+      </div>
+      <div className="mt-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm text-red-800">
+        {action.observation || "Search and evidence details are still available below."}
+      </div>
+    </section>
+  );
+}
+
+function LiveInvestigationPreview({
+  searches,
+  evidence
+}: {
+  searches: NonNullable<RedditLatestPayload["demo"]>["searchMap"];
+  evidence: NonNullable<RedditLatestPayload["demo"]>["evidenceQueue"];
+}) {
+  return (
+    <section className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+      <div className="rounded-xl border border-zinc-200 bg-white p-4">
+        <PanelHeader title="Live search preview" subtitle="Latest subreddit/query probes." />
+        <div className="mt-3 grid gap-2">
+          {searches.length ? (
+            searches.map((search) => (
+              <div key={search.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium text-zinc-950">{search.subreddit}</div>
+                  <div className="truncate font-mono text-xs text-zinc-600">"{search.query}"</div>
+                </div>
+                <div className="self-center rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-700">
+                  {search.resultCount ?? 0}
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyPanel text="The search preview will fill once Reddit tools run." />
+          )}
+        </div>
+      </div>
+      <div className="rounded-xl border border-zinc-200 bg-white p-4">
+        <PanelHeader title="Live evidence preview" subtitle="Threads being opened for signal checks." />
+        <div className="mt-3 grid gap-2">
+          {evidence.length ? (
+            evidence.map((item) => (
+              <div key={item.id} className="grid grid-cols-[auto_1fr_auto] items-start gap-3 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2 text-sm">
+                <StatusIcon status={item.status} />
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-zinc-950">{item.title}</div>
+                  <div className="line-clamp-1 text-xs text-zinc-600">{item.reason || item.outputSummary}</div>
+                </div>
+                <div className="rounded-md border border-amber-200 bg-white px-2 py-1 text-xs font-medium text-amber-700">
+                  {item.commentCount ?? 0}
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyPanel text="Fetched threads will appear here during the run." />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmptyRedditShell({ phases }: { phases: DemoPhase[] }) {
+  return (
+    <div className="grid gap-5 p-5">
+      <PhaseRail phases={phases.length ? phases : emptyPhases()} />
+      <div className="rounded-xl border border-dashed border-emerald-200 bg-white p-6 text-center">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
+          <Play className="h-5 w-5" />
+        </div>
+        <h2 className="text-lg font-semibold text-zinc-950">Ready to investigate Reddit demand</h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-600">
+          Start one run to watch the agent plan searches, inspect threads, reject weak matches, and choose the strongest Reddit signals.
+        </p>
+        <form action="/api/reddit-intelligence" method="post" className="mt-4">
+          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+            <Play className="h-4 w-4" />
+            Run Investigation
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function emptyPhases(): DemoPhase[] {
+  return [
+    { id: "profile", label: "Profile loaded", status: "active" },
+    { id: "planning", label: "Agent planning", status: "upcoming" },
+    { id: "searching", label: "Searching Reddit", status: "upcoming" },
+    { id: "fetching", label: "Fetching evidence", status: "upcoming" },
+    { id: "judging", label: "Judging candidates", status: "upcoming" },
+    { id: "selected", label: "Final threads selected", status: "upcoming" }
+  ];
+}
+
+function InvestigationDetails({
+  searches,
+  evidence
+}: {
+  searches: NonNullable<RedditLatestPayload["demo"]>["searchMap"];
+  evidence: NonNullable<RedditLatestPayload["demo"]>["evidenceQueue"];
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <PanelHeader title="Investigation details" subtitle="Supporting trace: where the harness searched and what evidence it fetched." />
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">supporting proof</div>
+      </div>
+      <div className="grid grid-cols-[1fr_1fr] gap-4 max-lg:grid-cols-1">
+        <SearchMapPanel searches={searches} />
+        <EvidenceQueuePanel evidence={evidence} />
+      </div>
+    </section>
+  );
+}
+
 function SearchMapPanel({ searches }: { searches: NonNullable<RedditLatestPayload["demo"]>["searchMap"] }) {
   return (
     <section className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -316,10 +469,14 @@ function EvidenceQueuePanel({ evidence }: { evidence: NonNullable<RedditLatestPa
 
 function DecisionBoard({
   selected,
-  rejected
+  rejected,
+  selectedTotal = selected.length,
+  rejectedTotal = rejected.length
 }: {
   selected: NonNullable<RedditLatestPayload["demo"]>["selected"];
   rejected: NonNullable<RedditLatestPayload["demo"]>["rejected"];
+  selectedTotal?: number;
+  rejectedTotal?: number;
 }) {
   return (
     <section className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -327,7 +484,7 @@ function DecisionBoard({
       <div className="mt-4 grid grid-cols-2 gap-5 max-lg:grid-cols-1">
         <div>
           <div className="mb-3 inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-            Selected ({selected.length})
+            Selected ({selectedTotal})
           </div>
           <div className="grid gap-2">
             {selected.length ? (
@@ -339,7 +496,7 @@ function DecisionBoard({
         </div>
         <div>
           <div className="mb-3 inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">
-            Rejected ({rejected.length})
+            Rejected ({rejectedTotal})
           </div>
           <div className="grid gap-2">
             {rejected.length ? (
@@ -380,53 +537,120 @@ function DecisionRow({ item, type }: { item: NonNullable<RedditLatestPayload["de
   );
 }
 
-function FinalThreads({ threads }: { threads: RedditLatestPayload["threads"] }) {
+function FeaturedSignalThread({ thread }: { thread: RedditLatestPayload["threads"][number] }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+      <div className="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
+        <PanelHeader title="Featured high-value signal thread" subtitle="Highest relevance selected thread from the investigation." />
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_280px] gap-5 p-5 max-lg:grid-cols-1">
+        <div className="min-w-0">
+          <div className="mb-2 inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+            {thread.subreddit}
+          </div>
+          <h2 className="text-xl font-semibold leading-7 text-zinc-950">{thread.title}</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600">{thread.why_relevant}</p>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {jsonStrings(thread.matched_services)
+              .slice(0, 4)
+              .map((service) => (
+                <Badge key={service} variant="info">
+                  {service}
+                </Badge>
+              ))}
+            {jsonStrings(thread.matched_icps)
+              .slice(0, 3)
+              .map((icp) => (
+                <Badge key={icp} variant="neutral">
+                  {icp}
+                </Badge>
+              ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Signal scores</div>
+          <div className="grid gap-3">
+            <SignalScore label="Relevance" value={thread.relevance_score} tone="emerald" />
+            <SignalScore label="Urgency" value={thread.urgency_score} tone="amber" />
+            <SignalScore label="Intent" value={thread.commercial_intent_score} tone="zinc" />
+          </div>
+          <div className="mt-4 text-center text-xs text-zinc-500">
+            {thread.comment_count} comments - Reddit score {thread.reddit_score}
+          </div>
+          <ThreadActions thread={thread} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OtherSignalThreads({ threads }: { threads: RedditLatestPayload["threads"] }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <PanelHeader title="Final high-signal threads" subtitle="The evidence set Module 2 can consume." />
-      <div className="mt-4 grid gap-3">
-        {threads.slice(0, 8).map((thread) => (
-          <div
-            key={thread.id}
-            className="group grid grid-cols-[1fr_auto] gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-zinc-300 hover:bg-white max-sm:grid-cols-1"
-          >
-            <div>
-              <div className="font-medium text-zinc-950">{thread.title}</div>
-              <div className="mt-1 text-sm leading-6 text-zinc-600">{thread.why_relevant}</div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {jsonStrings(thread.matched_services)
-                  .slice(0, 3)
-                  .map((service) => (
-                    <Badge key={service} variant="info">
-                      {service}
-                    </Badge>
-                  ))}
+      <PanelHeader title="Other high-signal threads" subtitle="Additional selected Reddit conversations ready for Module 2." />
+      <div className="mt-4 grid gap-2">
+        {threads.map((thread) => (
+          <div key={thread.id} className="grid grid-cols-[1fr_auto] gap-4 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3 max-md:grid-cols-1">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600">{thread.subreddit}</span>
+                <span className="text-xs font-semibold text-emerald-700">{thread.relevance_score} relevance</span>
               </div>
+              <div className="mt-2 font-medium text-zinc-950">{thread.title}</div>
+              <div className="mt-1 line-clamp-2 text-sm leading-6 text-zinc-600">{thread.why_relevant}</div>
             </div>
-            <div className="flex flex-col items-end gap-3 text-right max-sm:items-start max-sm:text-left">
-              <div>
-                <div className="text-xs font-medium uppercase text-zinc-500">{thread.subreddit}</div>
-                <div className="mt-1 text-2xl font-semibold text-zinc-950">{thread.relevance_score}</div>
-                <div className="text-xs text-zinc-500">relevance</div>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2 max-sm:justify-start">
-                <a href={thread.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50">
-                  Reddit
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </a>
-                <form action="/api/codex-research" method="post">
-                  <input type="hidden" name="threadId" value={thread.id} />
-                  <Button type="submit" variant="secondary">
-                    <Play className="h-4 w-4" />
-                    Run Codex
-                  </Button>
-                </form>
-              </div>
-            </div>
+            <ThreadActions thread={thread} compact />
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+function ThreadActions({ thread, compact = false }: { thread: RedditLatestPayload["threads"][number]; compact?: boolean }) {
+  return (
+    <div className={compact ? "flex flex-wrap items-center justify-end gap-2 max-md:justify-start" : "mt-4 flex flex-wrap justify-center gap-2"}>
+      <a href={thread.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50">
+        Reddit
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </a>
+      <form action="/api/codex-research" method="post">
+        <input type="hidden" name="threadId" value={thread.id} />
+        <Button type="submit" variant="secondary">
+          <Play className="h-4 w-4" />
+          Run Codex
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function SignalScore({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: number;
+  tone: "emerald" | "amber" | "zinc";
+}) {
+  const boundedValue = Math.max(0, Math.min(100, value));
+  const colors = {
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    zinc: "bg-zinc-700"
+  };
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-zinc-700">{label}</span>
+        <span className="text-sm font-semibold text-zinc-950">{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+        <div className={`h-full rounded-full ${colors[tone]}`} style={{ width: `${boundedValue}%` }} />
+      </div>
+    </div>
   );
 }
 
