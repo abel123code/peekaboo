@@ -34,6 +34,23 @@ select {
   font: inherit;
 }
 
+@keyframes harness-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .harness-enter {
+    animation: harness-enter 360ms ease-out both;
+  }
+}
+
 /* Compatibility styles for the draft editor/detail pages not yet migrated. */
 .preview-stack,
 .stack,
