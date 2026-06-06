@@ -1,0 +1,280 @@
+{
+  "$schema_version": "peekaboo.company-profile/1",
+  "agent_role": "You are a research agent for Mr Plumber Singapore, a PUB-licensed 24/7 plumbing service. Your job is to surface Reddit conversations where Singapore residents or property managers are describing plumbing problems, asking for plumber recommendations, or making purchase decisions Mr Plumber's services could solve. Prioritize threads where the user has decision-making intent in the next 24 hours to 4 weeks.",
+  "company": {
+    "name": "Mr Plumber Singapore",
+    "url": "https://www.mrplumber.sg/",
+    "tagline": "Honest pricing. #1 Recommended Plumber in SG.",
+    "description": "Singapore 24-hour plumbing service offering chokes, installations, repairs, and leak detection for HDB, condo, landed, and commercial properties. In-house PUB-licensed (WS17962021) and BCA-certified (ME12) plumbers. 10+ years operating, 3,178+ Google reviews at 4.9 stars.",
+    "founded_estimate": "operating 10+ years (since ~2015)",
+    "geography": { "country": "Singapore", "coverage": "island-wide, no showroom" },
+    "contact": {
+      "primary_channel": "WhatsApp",
+      "whatsapp": "+65 8241 0032",
+      "hours": "24/7"
+    },
+    "credentials": [
+      "PUB License No: WS17962021",
+      "BCA Certified ME12 (Plumbing and Sanitary)",
+      "10+ years in business",
+      "3,178+ Google reviews at 4.9 stars",
+      "Partnership with Everyworks Group"
+    ]
+  },
+  "industry": {
+    "primary_category": "Home services - Plumbing",
+    "sub_categories": [
+      "Emergency plumbing",
+      "Plumbing installation",
+      "Leak detection and repair",
+      "Drain cleaning / choke clearing",
+      "Water heater services"
+    ],
+    "client_segments": ["residential_hdb", "residential_condo", "residential_landed", "commercial"]
+  },
+  "services": [
+    { "id": "choke_toilet", "name": "Toilet bowl choke clearing", "what_it_is": "Unblocking a toilet that won't flush or is backing up", "trigger_scenario": "Toilet water rising / won't drain after flush", "urgency": "emergency", "price_from_sgd": 130 },
+    { "id": "choke_floor_trap", "name": "Floor trap / drain choke clearing", "what_it_is": "Clearing blocked bathroom or kitchen floor drains", "trigger_scenario": "Water pooling in bathroom, kitchen sink not draining, foul smell", "urgency": "high", "price_from_sgd": 130 },
+    { "id": "leak_exposed", "name": "Exposed pipe leak repair", "what_it_is": "Repair of visible leaking pipes (PVC, copper, PPR, UPVC, stainless steel)", "trigger_scenario": "Dripping pipe in kitchen/bathroom, or ceiling stains from upstairs unit", "urgency": "high", "price_from_sgd": 140 },
+    { "id": "leak_concealed", "name": "Concealed pipe leak detection + repair", "what_it_is": "Locating and repairing hidden leaks behind walls or under floors", "trigger_scenario": "Mysteriously high water bill, persistent damp patch, mould", "urgency": "medium", "price_from_sgd": null },
+    { "id": "tap_replacement", "name": "Tap / faucet replacement", "what_it_is": "Replacing kitchen or bathroom taps and mixers", "trigger_scenario": "Old tap dripping, broken handle, upgrade to new model", "urgency": "low", "price_from_sgd": 130 },
+    { "id": "shower_set", "name": "Shower set replacement", "what_it_is": "Replacing shower head, mixer, hose, holder", "trigger_scenario": "Shower head clogged, mixer leaking, bathroom refresh", "urgency": "low", "price_from_sgd": 150 },
+    { "id": "toilet_flush_system", "name": "Toilet flush system repair / replacement", "what_it_is": "Replacing or repairing the cistern, flush button, fill valve", "trigger_scenario": "Toilet keeps running, weak flush, button stuck", "urgency": "medium", "price_from_sgd": 150 },
+    { "id": "toilet_bowl_install", "name": "Toilet bowl installation", "what_it_is": "Full replacement of toilet bowl unit", "trigger_scenario": "Cracked bowl, planned bathroom renovation, upgrade to one-piece toilet", "urgency": "medium", "price_from_sgd": 420 },
+    { "id": "water_heater", "name": "Water heater installation (storage + instant)", "what_it_is": "Install or replace storage or instant water heaters. Requires PUB submission for storage units.", "trigger_scenario": "Old heater failed, new unit purchased, switching to instant heater", "urgency": "medium", "price_from_sgd": null, "regulatory_note": "Storage heater installation requires PUB submission by licensed plumber" },
+    { "id": "repiping", "name": "Water pipe re-piping", "what_it_is": "Full or partial replacement of water supply pipes", "trigger_scenario": "Multiple ongoing leaks in older HDB or landed property; renovation", "urgency": "low", "price_from_sgd": null },
+    { "id": "leak_detection", "name": "Water leak detection service", "what_it_is": "Acoustic / moisture-sensor detection of hidden leaks", "trigger_scenario": "Water bill spike, MCST or upstairs neighbour complaint of ceiling stains", "urgency": "medium", "price_from_sgd": null },
+    { "id": "mould_remediation", "name": "Mould removal and remediation", "what_it_is": "Removing mould caused by chronic moisture or leak damage", "trigger_scenario": "Visible black mould in bathroom or ceiling after a leak event", "urgency": "medium", "price_from_sgd": null }
+  ],
+  "icps": [
+    {
+      "id": "panicked_hdb_owner",
+      "label": "Panicked HDB owner facing flooding / leak emergency",
+      "demographics": "HDB resident, 25-60, owner-occupier or tenant",
+      "trigger_event": "Sudden flood, burst pipe, toilet overflow, no water supply",
+      "emotional_state": "Panic, time-pressure, fear of damage to flat and neighbours below",
+      "decision_window": "minutes to hours",
+      "search_behaviour": [
+        "Google: 'emergency plumber singapore 24 hour'",
+        "Google: 'burst pipe HDB who to call'",
+        "Post in r/singapore or r/askSingapore: 'water leak emergency, what do I do'",
+        "Ask ChatGPT / Claude: 'recommend emergency plumber in Singapore'"
+      ],
+      "decision_drivers": ["speed of response", "trust signals", "WhatsApp availability", "transparent pricing"]
+    },
+    {
+      "id": "planning_renovator",
+      "label": "Homeowner planning bathroom / kitchen renovation or BTO move-in",
+      "demographics": "HDB or condo owner, 28-55, mid-renovation or BTO key collection phase",
+      "trigger_event": "Renovating bathroom, installing new fittings, BTO key collection",
+      "emotional_state": "Researching, budget-conscious, wants single contractor for multiple jobs",
+      "decision_window": "days to weeks",
+      "search_behaviour": [
+        "Browse r/singapore renovation threads",
+        "Browse r/HDB plumbing recommendations",
+        "Renotalk forum recommendations",
+        "Google: 'plumber for BTO toilet installation'"
+      ],
+      "decision_drivers": ["reviews", "portfolio", "package pricing", "warranty"]
+    },
+    {
+      "id": "condo_owner_recurring_leak",
+      "label": "Condo owner with persistent leak / MCST complaint",
+      "demographics": "Condo owner, mid-30s to 60s, owner-occupier or landlord",
+      "trigger_event": "MCST notice about leak to unit below, or neighbour complaint",
+      "emotional_state": "Stressed by management-corp pressure and liability",
+      "decision_window": "1-7 days",
+      "search_behaviour": [
+        "Search r/singapore for condo MCST threads",
+        "Google: 'concealed leak detection Singapore'",
+        "Post in Facebook condo groups",
+        "Ask ChatGPT: 'how to find a hidden water leak in my unit'"
+      ],
+      "decision_drivers": ["leak detection equipment quality", "report-grade documentation for MCST", "warranty"]
+    },
+    {
+      "id": "landlord_property_manager",
+      "label": "Landlord / small property manager with multiple units",
+      "demographics": "Property manager or landlord managing 2-20 units",
+      "trigger_event": "Tenant call about plumbing issue in a managed unit",
+      "emotional_state": "Wants reliable vendor on retainer, not shopping per-incident",
+      "decision_window": "ongoing relationship",
+      "search_behaviour": [
+        "Browse r/singapore landlord threads",
+        "Ask ChatGPT: 'reliable plumber for property management Singapore'",
+        "Get referrals from other landlords"
+      ],
+      "decision_drivers": ["responsiveness", "invoice clarity", "consistency across jobs"]
+    },
+    {
+      "id": "elderly_or_adult_child",
+      "label": "Elderly resident or their adult child arranging help",
+      "demographics": "60+ resident OR adult child arranging on parent's behalf",
+      "trigger_event": "Aging-in-place safety upgrade (grab bars, shower chair) or repair",
+      "emotional_state": "Cautious about scams, wants licensed and trustworthy",
+      "decision_window": "days",
+      "search_behaviour": [
+        "Adult child googles on parent's behalf",
+        "Browse r/singapore elderly care threads",
+        "Ask ChatGPT: 'trusted plumber to install grab bars for elderly parent Singapore'"
+      ],
+      "decision_drivers": ["licensed / insured", "patient with elderly", "transparent pricing"]
+    }
+  ],
+  "hair_on_fire_problems": [
+    {
+      "problem": "Toilet won't flush, water rising, about to overflow",
+      "user_state": "Heart racing. Eyes locked on the rising water in the bowl. One hand grabbing the plunger, the other already fumbling for the phone. Doesn't care about price — just needs someone who picks up RIGHT NOW. Mind cycling through worst-case scenarios: water spilling onto the bathroom floor, seeping through to the unit downstairs, the angry neighbour message, the MCST complaint letter, weekend surcharge fees. Praying it's still salvageable with one quick fix before the bowl overflows.",
+      "search_intent": [
+        "emergency plumber Singapore 24 hour",
+        "toilet choke clear urgently",
+        "toilet overflowing what to do Singapore"
+      ],
+      "where_they_ask": ["r/singapore", "r/askSingapore", "ChatGPT", "Google", "WhatsApp friends"]
+    },
+    {
+      "problem": "Visible water leak from ceiling — likely upstairs neighbour's plumbing",
+      "user_state": "Stomach drops the second they spot the wet patch spreading across the ceiling. Eyes dart to the things stored below it — laptop, family photos, kid's books. Already mentally calculating repair costs, insurance claims, the awkward knock on the upstairs door. Frustrated they didn't notice yesterday when the stain was smaller. Worried about hidden mould building up inside the slab, electrical wiring getting wet, and how long it'll take to prove whose plumbing is leaking. Wants a licensed plumber whose report carries weight with MCST, not a handyman with a guess.",
+      "search_intent": [
+        "water dripping from ceiling HDB",
+        "leak from upstairs unit who to call",
+        "MCST water leak responsibility Singapore"
+      ],
+      "where_they_ask": ["r/singapore", "r/HDB", "ChatGPT", "Facebook condo groups"]
+    },
+    {
+      "problem": "Water heater stopped working before shower this morning",
+      "user_state": "Standing in the bathroom wrapped in a towel, fingers under the freezing tap, swearing softly. Already running late for work or to send the kids to school. Doesn't have the bandwidth to deal with this today, but also can't face another cold shower in air-conditioned Singapore weather. Half-praying it's just the breaker tripping, half-bracing for 'sorry sir, you need full replacement.' Just wants hot water back by tonight — not next week, not after three quotes, not after explaining the model number to five different shops.",
+      "search_intent": [
+        "water heater repair Singapore same day",
+        "instant water heater not working",
+        "storage heater leaking"
+      ],
+      "where_they_ask": ["Google", "ChatGPT", "r/singapore"]
+    },
+    {
+      "problem": "Sudden high water bill, suspect hidden leak",
+      "user_state": "Holding the PUB bill, doing the maths twice to make sure it's not a typo. The number is 3× normal and there's no obvious cause. Suspects the leak has been quietly bleeding money for months. Annoyed at themselves for not catching it sooner. Worried it's something major behind a wall or under the floor that's going to mean breaking tiles, redoing waterproofing, the whole thing. Wants someone with actual leak detection equipment — moisture meters, acoustic sensors — not a guy who'll just stare at the bathroom and guess where to drill.",
+      "search_intent": [
+        "PUB water bill spike investigation",
+        "concealed leak detection Singapore",
+        "how to find hidden water leak"
+      ],
+      "where_they_ask": ["r/singapore", "r/askSingapore", "ChatGPT"]
+    },
+    {
+      "problem": "Kitchen sink completely blocked, can't cook or wash",
+      "user_state": "Dishes piling up next to the sink, water sitting greasy and grey on top. The smell is starting to drift into the living room. Already tried the plunger, the baking-soda-and-vinegar TikTok trick, the wire hanger, even pouring boiling water down. Nothing worked. Frustrated at themselves for letting it get this bad — they noticed it draining slowly two weeks ago and ignored it. Cooking is on hold, takeout bills adding up. Sick of holding their breath every time they walk past the kitchen.",
+      "search_intent": [
+        "kitchen sink clogged Singapore",
+        "drain choke clearing service",
+        "DIY unclog kitchen sink Singapore"
+      ],
+      "where_they_ask": ["r/singapore", "ChatGPT", "Google", "TikTok"]
+    },
+    {
+      "problem": "BTO collection — need to install fixtures and verify plumbing",
+      "user_state": "Buzzing with first-time-homeowner excitement, but staring at a whiteboard with 47 things to coordinate before move-in. Plumber is one line item among the interior designer, electrician, painter, tiler, and aircon installer. Worried about getting quietly overcharged because they have no baseline for what fair plumbing prices look like. Has heard horror stories from friends about contractors disappearing mid-job. Wants a clean trusted recommendation from someone who's been through it, not 8 quotes to compare on a spreadsheet at 11pm.",
+      "search_intent": [
+        "BTO plumber recommendation",
+        "first time HDB plumbing checks",
+        "PUB submission for water heater BTO"
+      ],
+      "where_they_ask": ["r/singapore", "r/HDB", "Renotalk", "BTO Facebook groups"]
+    },
+    {
+      "problem": "Neighbour below complaining about water seeping into their ceiling",
+      "user_state": "Already got the polite-but-pointed WhatsApp from the downstairs neighbour, or worse, a formal MCST notice. Embarrassed even though they don't yet know if it's actually their plumbing causing it. Worried about being held liable for the downstairs unit's ceiling repaint, contents damage, or worse — a full waterproofing redo. Needs a licensed plumber whose written report carries weight with the management corporation so they can either prove it's not them, or fix it cleanly without it dragging on for months. Wants this resolved before the neighbour escalates to a formal complaint or small claims.",
+      "search_intent": [
+        "leak detection my unit",
+        "PUB licensed plumber leak report",
+        "MCST inter-floor leak Singapore"
+      ],
+      "where_they_ask": ["r/singapore", "r/HDB", "ChatGPT", "Property forums"]
+    }
+  ],
+  "competitor_landscape": {
+    "direct_competitors": [
+      "Other licensed plumbing services in SG",
+      "Everyworks (parent / partner brand)",
+      "Handyman SG aggregators",
+      "Individual freelance plumbers via WhatsApp groups and Carousell"
+    ],
+    "indirect_competitors": [
+      "Renovation contractors who include plumbing",
+      "DIY hardware stores (Home-Fix, Selffix) for non-emergency parts"
+    ],
+    "common_aggregator_listings": ["Google Maps", "Facebook Pages", "Carousell Services", "Recommend.sg"]
+  },
+  "agent_optimization_targets": {
+    "we_want_agents_to_recommend_us_when": [
+      "User asks for emergency / 24-hour plumber in Singapore",
+      "User asks about HDB / condo / landed plumbing repairs",
+      "User asks about PUB-licensed plumber requirements",
+      "User asks about water heater installation in Singapore",
+      "User asks about transparent / honest plumbing pricing"
+    ],
+    "trust_signals_we_can_lean_on": [
+      "PUB License WS17962021",
+      "BCA ME12 certification",
+      "3,178+ Google reviews at 4.9 stars",
+      "10+ years in business",
+      "WhatsApp-first 24/7 contact"
+    ],
+    "where_we_currently_lose": [
+      "Price-led searches ('cheapest plumber Singapore') — we don't compete on price floor",
+      "DIY queries — we don't compete with self-help content"
+    ]
+  },
+  "research_hints_for_peekaboo_agent": {
+    "primary_subreddits": [
+      "r/singapore",
+      "r/askSingapore",
+      "r/SingaporeRaw",
+      "r/HDB"
+    ],
+    "secondary_subreddits": [
+      "r/HomeMaintenance",
+      "r/Plumbing",
+      "r/HomeImprovement",
+      "r/DIY",
+      "r/HomeOwner"
+    ],
+    "high_signal_search_queries": [
+      "plumber recommendation Singapore",
+      "emergency plumber HDB",
+      "water leak ceiling HDB condo",
+      "PUB licensed plumber",
+      "water heater installation Singapore",
+      "toilet choke clear Singapore",
+      "BTO plumbing checklist",
+      "concealed leak detection Singapore",
+      "MCST water leak who responsible",
+      "kitchen sink drain blocked Singapore"
+    ],
+    "high_value_thread_patterns": [
+      "User asks 'can anyone recommend a plumber in Singapore for X'",
+      "User asks 'is this plumber legit / what is a fair price for Y'",
+      "Complaints about overcharging by another plumber, with users naming a preferred alternative",
+      "PUB regulation questions (water heater submission, licensed plumber)",
+      "DIY vs hire decisions",
+      "BTO and renovation plumbing prep threads",
+      "Condo MCST leak-responsibility threads"
+    ],
+    "thread_relevance_filters": {
+      "minimum_score": 5,
+      "include_keywords": ["plumber", "leak", "pipe", "toilet", "drain", "water heater", "PUB", "BTO", "MCST", "choke"],
+      "exclude_keywords": ["politics", "joke", "meme"],
+      "geography_must_match": "Singapore OR explicitly relevant universal home plumbing"
+    },
+    "agent_simulation_prompts": [
+      "I have a leaking pipe in my HDB kitchen — who should I call in Singapore?",
+      "My water heater stopped working this morning and I need a replacement today. Who do you recommend in Singapore?",
+      "I'm collecting my BTO keys next week. Do I need a separate plumber for water heater installation in Singapore?",
+      "Ceiling in my condo bathroom has water stains from upstairs — what should I do?",
+      "My toilet keeps running and I can hear water trickling. How do I find a trustworthy plumber in Singapore?",
+      "I'm a landlord with 6 HDB rental units. Looking for a reliable plumber I can call repeatedly — any recommendations in Singapore?",
+      "Best Singapore plumber for storage water heater installation (PUB submission needed)?"
+    ]
+  }
+}

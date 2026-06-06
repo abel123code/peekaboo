@@ -31,7 +31,7 @@ export default async function ClientsPage() {
   return (
     <>
       <div className="mb-8 flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white px-5 py-4 shadow-sm">
-        <PeekabooLogo size="lg" />
+        <PeekabooLogo size="xl" />
         <div className="flex flex-wrap gap-2">
           <ButtonLink href="/reddit" variant="secondary">
             <Search className="h-4 w-4" />

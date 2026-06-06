@@ -224,6 +224,11 @@ function clampScore(value: number, fallback = 50) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function normalizeJudgeScore(value: number, fallback = 50) {
+  if (!Number.isFinite(value)) return fallback;
+  return clampScore(value > 0 && value <= 10 ? value * 10 : value, fallback);
+}
+
 function uniqueStrings(values: string[], limit = 50) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].slice(0, limit);
 }
@@ -253,6 +258,76 @@ function traceRecord(value: Record<string, unknown>) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function keywordMatches(text: string, keyword: string) {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return false;
+  const pattern = normalized
+    .split(/\s+/)
+    .map(escapeRegExp)
+    .join("\\s+");
+  return new RegExp(`\\b${pattern}\\b`, "i").test(text);
+}
+
+function threadText(thread: RedditThreadCandidate | RedditFetchedThread) {
+  return `${thread.title}\n${thread.selftext}\n${"thread_content" in thread ? thread.thread_content : ""}`.toLowerCase();
+}
+
+function matchedFilterKeywords(profile: RedditCompanyProfile, text: string) {
+  return profile.research_hints_for_peekaboo_agent.thread_relevance_filters.include_keywords.filter((keyword) =>
+    keywordMatches(text, keyword)
+  );
+}
+
+function directPlumbingEvidence(text: string) {
+  const directKeywords = [
+    "plumber",
+    "plumbing",
+    "leak",
+    "leaking",
+    "pipe",
+    "pipes",
+    "toilet",
+    "drain",
+    "water heater",
+    "storage heater",
+    "choke",
+    "choked",
+    "burst pipe",
+    "concealed leak"
+  ];
+  return directKeywords.filter((keyword) => keywordMatches(text, keyword));
+}
+
+function isExcludedByProfile(profile: RedditCompanyProfile, text: string) {
+  return profile.research_hints_for_peekaboo_agent.thread_relevance_filters.exclude_keywords.some((keyword) =>
+    keywordMatches(text, keyword)
+  );
+}
+
+function hasSingaporeContext(text: string) {
+  return /\b(singapore|sg|hdb|bto|pub|mcst|condo)\b/i.test(text);
+}
+
+function passesPlumbingRelevanceGate(profile: RedditCompanyProfile, thread: RedditThreadCandidate | RedditFetchedThread) {
+  const text = threadText(thread);
+  if (!directPlumbingEvidence(text).length) return false;
+  if (isExcludedByProfile(profile, text)) return false;
+  return hasSingaporeContext(text) || thread.search_subreddit.toLowerCase().includes("plumbing");
+}
+
+function isHighConfidenceFallbackThread(profile: RedditCompanyProfile, thread: RedditFetchedThread) {
+  if (!passesPlumbingRelevanceGate(profile, thread)) return false;
+  const text = threadText(thread);
+  const titleText = thread.title.toLowerCase();
+  const directMatches = directPlumbingEvidence(text);
+  const titleMatches = directPlumbingEvidence(titleText);
+  return localCandidateScore(profile, thread) >= 50 && (titleMatches.length > 0 || directMatches.length >= 2);
 }
 
 async function fileExists(filePath: string) {
@@ -377,16 +452,16 @@ function buildInvestigationPlan(profile: RedditCompanyProfile): InvestigationPla
 }
 
 function localCandidateScore(profile: RedditCompanyProfile, candidate: RedditThreadCandidate) {
-  const text = `${candidate.title} ${candidate.selftext}`.toLowerCase();
-  const filters = profile.research_hints_for_peekaboo_agent.thread_relevance_filters;
-  const keywordScore = filters.include_keywords.reduce(
-    (score, keyword) => score + (text.includes(keyword.toLowerCase()) ? 10 : 0),
-    0
-  );
-  const singaporeScore = /\b(singapore|sg|hdb|bto|pub|mcst|condo)\b/i.test(text) ? 25 : 0;
-  const engagementScore = Math.min(25, Math.log10(candidate.reddit_score + candidate.comment_count + 2) * 12);
-  const recencyScore = candidate.created_utc && Date.now() - new Date(candidate.created_utc).getTime() < 395 * 86_400_000 ? 15 : 5;
-  const excludedPenalty = filters.exclude_keywords.some((keyword) => text.includes(keyword.toLowerCase())) ? -40 : 0;
+  const text = threadText(candidate);
+  const directMatches = directPlumbingEvidence(text);
+  if (!directMatches.length) return 0;
+
+  const filterMatches = matchedFilterKeywords(profile, text);
+  const keywordScore = Math.min(45, filterMatches.length * 12 + directMatches.length * 8);
+  const singaporeScore = hasSingaporeContext(text) ? 20 : 0;
+  const engagementScore = Math.min(20, Math.log10(candidate.reddit_score + candidate.comment_count + 2) * 10);
+  const recencyScore = candidate.created_utc && Date.now() - new Date(candidate.created_utc).getTime() < 395 * 86_400_000 ? 10 : 3;
+  const excludedPenalty = isExcludedByProfile(profile, text) ? -60 : 0;
   return clampScore(keywordScore + singaporeScore + engagementScore + recencyScore + excludedPenalty, 0);
 }
 
@@ -591,7 +666,7 @@ function redditToolDefinition(name: TraceToolCall["tool"]) {
   return definition;
 }
 
-function buildRedditHarnessTools(state: InvestigationState): AnyHarnessTool[] {
+function buildRedditHarnessTools(profile: RedditCompanyProfile, state: InvestigationState): AnyHarnessTool[] {
   const searchTool: HarnessTool<SearchRedditInput> = {
     definition: redditToolDefinition("search_reddit"),
     parse: (raw) =>
@@ -627,9 +702,11 @@ function buildRedditHarnessTools(state: InvestigationState): AnyHarnessTool[] {
         reason: "Fallback parsed fetch"
       }),
     policy: (input) =>
-      input.reddit_id?.trim()
-        ? { allowed: true, reason: "Thread fetch has a candidate id and is inside the tool budget." }
-        : { allowed: false, reason: "Thread fetch requires a reddit_id returned by search_reddit." },
+      !input.reddit_id?.trim()
+        ? { allowed: false, reason: "Thread fetch requires a reddit_id returned by search_reddit." }
+        : state.candidates.has(input.reddit_id) && !passesPlumbingRelevanceGate(profile, state.candidates.get(input.reddit_id)!)
+          ? { allowed: false, reason: "Candidate lacks direct plumbing evidence in the search result, so the harness will not spend a fetch on it." }
+          : { allowed: true, reason: "Thread fetch has a candidate id and is inside the tool budget." },
     execute: (input) => handleFetchThread(state, input, "agent"),
     summarizeInput: (input) => `${input.reddit_id} - ${input.reason || "inspect evidence"}`,
     summarizeOutput: (output) => {
@@ -712,6 +789,8 @@ async function runAgentToolLoop(profile: RedditCompanyProfile, state: Investigat
     "- Search at least 6 combinations across the primary Singapore subreddits.",
     "- Fetch promising threads before selecting or rejecting them.",
     "- Record visible decisions when you expand, reject, or find a strong candidate.",
+    "- Use the company profile as the relevance source of truth. A thread is relevant only if it shows direct plumbing, leak, pipe, toilet, drain, water heater, choke, PUB, MCST, HDB/BTO renovation plumbing, or plumber-hiring intent.",
+    "- Do not fetch or select generic Singapore news, travel, entertainment, business, lifestyle, politics, or viral threads unless the actual post/comments contain direct plumbing service evidence.",
     "- Prioritize near-term purchase intent, Singapore relevance, plumbing problem specificity, and evidence in comments.",
     "- Use finish_investigation when the research loop has enough evidence or further action should move to deterministic judging.",
     "- Stop after you have enough evidence for 5-8 final high-signal threads.",
@@ -725,7 +804,7 @@ async function runAgentToolLoop(profile: RedditCompanyProfile, state: Investigat
     objective: "Find 5-8 high-signal Reddit conversations for Mr Plumber Singapore and record why weak threads are rejected.",
     systemInstruction: profile.agent_role,
     prompt,
-    tools: buildRedditHarnessTools(state),
+    tools: buildRedditHarnessTools(profile, state),
     maxTurns: options.maxAgentTurns || 8,
     maxToolCalls: 28,
     maxOutputTokens: 1200,
@@ -905,6 +984,7 @@ async function backfillSearches(profile: RedditCompanyProfile, state: Investigat
 async function fetchBestCandidates(profile: RedditCompanyProfile, state: InvestigationState, options: InvestigationOptions) {
   await setStage("fetching candidate thread evidence", options);
   const ranked = [...state.candidates.values()]
+    .filter((candidate) => passesPlumbingRelevanceGate(profile, candidate))
     .sort((a, b) => localCandidateScore(profile, b) - localCandidateScore(profile, a))
     .slice(0, 14);
 
@@ -917,7 +997,7 @@ async function fetchBestCandidates(profile: RedditCompanyProfile, state: Investi
         reason: "Fetch top locally ranked candidate for final evidence review."
       },
       options,
-      "Candidate ranks high on local relevance, geography, engagement, or urgency signals."
+      "Candidate passed the plumbing relevance gate and ranks high on local evidence signals."
     );
   }
 }
@@ -925,6 +1005,7 @@ async function fetchBestCandidates(profile: RedditCompanyProfile, state: Investi
 function fallbackSelectedThread(profile: RedditCompanyProfile, thread: RedditFetchedThread): RedditInvestigationSelectedThread {
   const text = `${thread.title}\n${thread.thread_content}`;
   const relevanceScore = localCandidateScore(profile, thread);
+  const evidence = directPlumbingEvidence(text).slice(0, 3).join(", ");
   return {
     reddit_id: thread.reddit_id,
     subreddit: `r/${thread.subreddit}`,
@@ -933,7 +1014,7 @@ function fallbackSelectedThread(profile: RedditCompanyProfile, thread: RedditFet
     relevance_score: relevanceScore,
     urgency_score: /emergency|urgent|overflow|leak|burst|choke|not working|stopped/i.test(text) ? 80 : 55,
     commercial_intent_score: /recommend|quote|price|plumber|who should|who to call|service|install/i.test(text) ? 82 : 50,
-    why_relevant: "Selected by local fallback scoring because it matches the profile's plumbing keywords, geography, and engagement signals.",
+    why_relevant: `Selected by conservative fallback because the thread has direct plumbing evidence${evidence ? ` (${evidence})` : ""} and Singapore/home-service context.`,
     matched_services: matchedServices(profile, text),
     matched_icps: matchedIcps(profile, text),
     thread_content: thread.thread_content
@@ -955,7 +1036,38 @@ async function judgeFinalThreads(profile: RedditCompanyProfile, state: Investiga
     throw new Error("No Reddit threads were fetched. Check Reddit credentials, subreddit availability, or search queries.");
   }
 
-  const candidatesForJudge = fetched.map((thread) => ({
+  const relevantFetched = fetched.filter((thread) => passesPlumbingRelevanceGate(profile, thread));
+  const gateRejected: RedditInvestigationRejectedThread[] = fetched
+    .filter((thread) => !passesPlumbingRelevanceGate(profile, thread))
+    .map((thread) => ({
+      reddit_id: thread.reddit_id,
+      subreddit: `r/${thread.subreddit}`,
+      title: thread.title,
+      reason: "Rejected by deterministic plumbing relevance gate: no direct plumbing/service evidence was found."
+    }));
+
+  if (!relevantFetched.length) {
+    state.trace.selected_threads = [];
+    state.trace.rejected_threads = gateRejected.slice(0, 30);
+    state.trace.summary = `No fetched Reddit threads passed the plumbing relevance gate from ${state.candidates.size} candidates.`;
+    addSyntheticHarnessEvent(state, {
+      type: "observation",
+      actor: "judge",
+      label: "Final judge blocked by relevance gate",
+      summary: state.trace.summary,
+      status: "completed",
+      tool: "final_judge",
+      output: {
+        selected_threads: 0,
+        rejected_threads: state.trace.rejected_threads.length,
+        candidate_count: state.candidates.size
+      }
+    });
+    await emitTrace(state, options);
+    return;
+  }
+
+  const candidatesForJudge = relevantFetched.map((thread) => ({
     ...compactThread(thread),
     local_score: localCandidateScore(profile, thread),
     content: thread.thread_content.slice(0, 2500)
@@ -990,22 +1102,23 @@ async function judgeFinalThreads(profile: RedditCompanyProfile, state: Investiga
     maxOutputTokens: 3200
   });
 
-  const fetchedById = new Map(fetched.map((thread) => [thread.reddit_id, thread]));
+  const fetchedById = new Map(relevantFetched.map((thread) => [thread.reddit_id, thread]));
   const selectedIds = new Set<string>();
   const selected: RedditInvestigationSelectedThread[] = [];
 
   for (const item of judge.selected_threads) {
     const thread = fetchedById.get(item.reddit_id);
     if (!thread || selectedIds.has(thread.reddit_id)) continue;
+    if (!passesPlumbingRelevanceGate(profile, thread)) continue;
     selectedIds.add(thread.reddit_id);
     selected.push({
       reddit_id: thread.reddit_id,
       subreddit: `r/${thread.subreddit}`,
       title: thread.title,
       url: thread.url,
-      relevance_score: clampScore(item.relevance_score),
-      urgency_score: clampScore(item.urgency_score),
-      commercial_intent_score: clampScore(item.commercial_intent_score),
+      relevance_score: normalizeJudgeScore(item.relevance_score),
+      urgency_score: normalizeJudgeScore(item.urgency_score),
+      commercial_intent_score: normalizeJudgeScore(item.commercial_intent_score),
       why_relevant: item.why_relevant,
       matched_services: item.matched_services.slice(0, 5),
       matched_icps: item.matched_icps.slice(0, 4),
@@ -1014,15 +1127,16 @@ async function judgeFinalThreads(profile: RedditCompanyProfile, state: Investiga
   }
 
   if (selected.length < 5) {
-    for (const thread of fetched.sort((a, b) => localCandidateScore(profile, b) - localCandidateScore(profile, a))) {
+    for (const thread of relevantFetched.sort((a, b) => localCandidateScore(profile, b) - localCandidateScore(profile, a))) {
       if (selected.length >= 8) break;
       if (selectedIds.has(thread.reddit_id)) continue;
+      if (!isHighConfidenceFallbackThread(profile, thread)) continue;
       selectedIds.add(thread.reddit_id);
       selected.push(fallbackSelectedThread(profile, thread));
     }
   }
 
-  const rejected: RedditInvestigationRejectedThread[] = [];
+  const rejected: RedditInvestigationRejectedThread[] = [...gateRejected];
   for (const item of judge.rejected_threads) {
     const thread = fetchedById.get(item.reddit_id) || state.candidates.get(item.reddit_id);
     if (!thread || selectedIds.has(thread.reddit_id)) continue;
@@ -1040,7 +1154,9 @@ async function judgeFinalThreads(profile: RedditCompanyProfile, state: Investiga
       reddit_id: thread.reddit_id,
       subreddit: `r/${thread.subreddit}`,
       title: thread.title,
-      reason: "Fetched for evidence but ranked below the final selected set."
+      reason: passesPlumbingRelevanceGate(profile, thread)
+        ? "Fetched for evidence but ranked below the final selected set."
+        : "Rejected by deterministic plumbing relevance gate: no direct plumbing/service evidence was found."
     });
   }
 
