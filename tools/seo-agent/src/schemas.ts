@@ -527,6 +527,19 @@ export const CodexContentBriefSchema = z
     title: z.string().min(1),
     audience: z.string().min(1),
     promise: z.string().min(1),
+    content_ideas: z
+      .array(
+        z
+          .object({
+            title: z.string().min(1),
+            angle: z.string().min(1),
+            target_query: z.string().min(1),
+            rationale: z.string().min(1),
+            source_signals: z.array(z.string().min(1)).default([])
+          })
+          .strict()
+      )
+      .length(3),
     sections: z.array(z.string().min(1)).default([]),
     questions_to_answer: z.array(z.string().min(1)).default([]),
     citation_targets: z.array(z.string().min(1)).default([]),

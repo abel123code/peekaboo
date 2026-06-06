@@ -549,10 +549,35 @@ async function runVirtualSubagent(angle: CodexResearchAngle, thread: CodexSelect
 }
 
 function defaultBrief(thread: CodexSelectedRedditThread, trace: CodexResearchTrace): CodexContentBrief {
+  const queries = trace.repeated_queries.length ? trace.repeated_queries : [thread.title, "HDB plumbing responsibility Singapore", "emergency plumber Singapore"];
+  const sourceSignals = trace.trusted_sources.map((source) => source.title).filter(Boolean).slice(0, 4);
   return {
     title: `${thread.title}: Singapore homeowner guide`,
     audience: "Singapore HDB, condo, landlord, and homeowner searchers facing an urgent plumbing problem.",
     promise: "Explain what to do first, who is responsible, when DIY is unsafe, and when to call Mr Plumber SG.",
+    content_ideas: [
+      {
+        title: `${thread.title}: what to do in the first 10 minutes`,
+        angle: "Emergency action guide for a panicking homeowner.",
+        target_query: queries[0] || thread.title,
+        rationale: "The agent lanes looked for immediate actions, responsibility, and plumber-call boundaries.",
+        source_signals: sourceSignals
+      },
+      {
+        title: "HDB, condo, landlord or neighbour: who is responsible for a plumbing leak?",
+        angle: "Responsibility matrix for Singapore homes.",
+        target_query: queries[1] || "HDB plumbing responsibility Singapore",
+        rationale: "The responsibility lane focused on payment, evidence, HDB, MCST, landlord, and neighbour context.",
+        source_signals: sourceSignals
+      },
+      {
+        title: "DIY or call a plumber? Singapore plumbing problems ranked by risk",
+        angle: "Decision guide that separates safe checks from professional repair moments.",
+        target_query: queries[2] || "when to call emergency plumber Singapore",
+        rationale: "The vendor/DIY lane looked for clear decision criteria that generic service pages often miss.",
+        source_signals: sourceSignals
+      }
+    ],
     sections: [
       "First 10 minutes: stop water damage and stay safe",
       "Who is responsible: HDB, condo MCST, landlord, upstairs neighbour, or owner",
@@ -596,12 +621,44 @@ async function buildContentBrief(thread: CodexSelectedRedditThread, trace: Codex
           questions_to_answer: { type: "array", items: { type: "string" } },
           citation_targets: { type: "array", items: { type: "string" } },
           content_rules: { type: "array", items: { type: "string" } },
-          agent_findings: { type: "array", items: { type: "string" } }
+          agent_findings: { type: "array", items: { type: "string" } },
+          content_ideas: {
+            type: "array",
+            minItems: 3,
+            maxItems: 3,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                title: { type: "string" },
+                angle: { type: "string" },
+                target_query: { type: "string" },
+                rationale: { type: "string" },
+                source_signals: { type: "array", items: { type: "string" } }
+              },
+              required: ["title", "angle", "target_query", "rationale", "source_signals"]
+            }
+          }
         },
-        required: ["title", "audience", "promise", "sections", "questions_to_answer", "citation_targets", "content_rules", "agent_findings"]
+        required: [
+          "title",
+          "audience",
+          "promise",
+          "content_ideas",
+          "sections",
+          "questions_to_answer",
+          "citation_targets",
+          "content_rules",
+          "agent_findings"
+        ]
       },
       systemInstruction: "Create concise AEO content briefs from observable agent traces. Do not include hidden chain-of-thought.",
-      userPrompt: JSON.stringify({ thread, trace }, null, 2),
+      userPrompt: [
+        "Create exactly 3 content ideas the user can choose from.",
+        "Each idea must be grounded in the provided Reddit thread and observable Codex trace signals.",
+        "Do not invent sources. If source signals are weak, say what pattern the agents looked for.",
+        JSON.stringify({ thread, trace }, null, 2)
+      ].join("\n\n"),
       maxOutputTokens: 1800
     });
     return CodexContentBriefSchema.parse(brief);

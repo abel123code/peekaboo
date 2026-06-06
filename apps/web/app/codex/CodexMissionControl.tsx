@@ -16,6 +16,7 @@ import {
   Search,
   Sparkles,
   Terminal,
+  WandSparkles,
   XCircle
 } from "lucide-react";
 import type { CodexLatestPayload, CodexPhase, TraceRecord } from "../../lib/codex-demo";
@@ -70,6 +71,9 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
   const contentBrief = asRecord(latestRun?.content_brief);
   const rawEvents = data?.trace.events.slice(-80).reverse() || [];
   const firstThread = data?.redditThreads[0] || null;
+  const contentIdeas = buildContentIdeas(contentBrief, selectedThread);
+  const visibleThinking = latestVisibleThinking(rawEvents);
+  const toolCalls = latestToolCalls(rawEvents);
 
   return (
     <div className="-mx-1 pb-8">
@@ -107,23 +111,29 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
                 {demo ? <NowRunning action={demo.currentAction} /> : <EmptyPanel text="Start a Codex research run to populate the live trace." />}
               </div>
 
-              {demo ? <MasterPlan plan={data?.trace.plan || []} /> : null}
-              {demo ? <SubagentLanes lanes={demo.lanes} /> : null}
+              {demo ? <DemoStory demo={demo} /> : null}
+              <div className="grid grid-cols-[1fr_1fr] gap-4 max-lg:grid-cols-1">
+                <VisibleThinkingPanel action={demo?.currentAction || null} events={visibleThinking} />
+                <ToolCallsPanel events={toolCalls} />
+              </div>
             </div>
           </section>
 
-          {demo ? (
-            <section className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <Metric label="Events" value={demo.counts.events} />
-              <Metric label="Subagents" value={demo.counts.subagents} />
-              <Metric label="Trusted" value={demo.counts.trustedSources} />
-              <Metric label="Ignored" value={demo.counts.ignoredSources} />
-            </section>
-          ) : null}
+          <ContentIdeaChooser ideas={contentIdeas} isRunning={isActive} />
 
-          {demo ? <SourceIntelligence demo={demo} /> : null}
-          {latestRun ? <ContentBrief brief={contentBrief} /> : null}
-          {latestRun?.proposed_skill_diff ? <SkillDiff diff={latestRun.proposed_skill_diff} /> : null}
+          {latestRun ? (
+            <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
+              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-zinc-900">
+                More details: subagent lanes, evidence, generated brief, and skill learning
+              </summary>
+              <div className="grid gap-4 border-t border-zinc-100 p-5">
+                {demo ? <SubagentLanes lanes={demo.lanes} /> : null}
+                {demo ? <SourceIntelligence demo={demo} /> : null}
+                <ContentBrief brief={contentBrief} />
+                {latestRun.proposed_skill_diff ? <SkillDiff diff={latestRun.proposed_skill_diff} /> : null}
+              </div>
+            </details>
+          ) : null}
 
           {data?.redditThreads.length ? <ThreadChooser threads={data.redditThreads} isActive={isActive} /> : null}
           {data ? <RawTrace eventCount={data.trace.events.length} events={rawEvents} /> : null}
@@ -270,6 +280,236 @@ function NowRunning({ action }: { action: NonNullable<CodexLatestPayload["demo"]
         <pre className="whitespace-pre-wrap break-words">{action.code}</pre>
       </div>
       <p className="mt-3 text-sm leading-6 text-zinc-600">{action.summary}</p>
+    </section>
+  );
+}
+
+type ContentIdea = {
+  id: string;
+  title: string;
+  angle: string;
+  targetQuery: string;
+  rationale: string;
+  sourceSignals: string[];
+};
+
+function buildContentIdeas(brief: TraceRecord, _selectedThread: TraceRecord): ContentIdea[] {
+  const rawIdeas = Array.isArray(brief.content_ideas) ? brief.content_ideas : [];
+  return rawIdeas
+    .map((idea, index) => {
+      const record = asRecord(idea);
+      return {
+        id: `idea-${index + 1}`,
+        title: text(record.title, ""),
+        angle: text(record.angle, ""),
+        targetQuery: text(record.target_query, ""),
+        rationale: text(record.rationale, ""),
+        sourceSignals: jsonStrings(record.source_signals)
+      };
+    })
+    .filter((idea) => idea.title && idea.angle && idea.rationale)
+    .slice(0, 3);
+}
+
+function latestVisibleThinking(events: TraceRecord[]) {
+  return events
+    .filter((event) => {
+      const type = text(event.type, "");
+      return ["plan", "agent_message", "decision", "fallback"].includes(type);
+    })
+    .slice(0, 5);
+}
+
+function latestToolCalls(events: TraceRecord[]) {
+  return events
+    .filter((event) => {
+      const type = text(event.type, "");
+      return ["web_search", "command_execution", "tool_call", "mcp_tool_call"].includes(type);
+    })
+    .slice(0, 6);
+}
+
+function VisibleThinkingPanel({
+  action,
+  events
+}: {
+  action: NonNullable<CodexLatestPayload["demo"]>["currentAction"] | null;
+  events: TraceRecord[];
+}) {
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <PanelHeader title="Visible agent thinking" subtitle="Decision summaries and rationale, not hidden chain-of-thought." icon={<BrainCircuit className="h-4 w-4" />} />
+      {action ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+            <span>{action.agentLabel}</span>
+            <StatusBadge status={action.status} />
+          </div>
+          <div className="mt-2 font-semibold text-zinc-950">{action.title}</div>
+          <p className="mt-1 text-sm leading-6 text-zinc-700">{action.summary}</p>
+        </div>
+      ) : (
+        <EmptyPanel text="The agent's visible decisions will appear here." />
+      )}
+      <div className="mt-3 grid gap-2">
+        {events.length ? (
+          events.map((event, index) => (
+            <div key={`${text(event.id, "thought")}-${index}`} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
+              <div className="text-xs font-medium text-zinc-500">{text(event.agent_label, "Master Codex")} - {text(event.label, "Decision")}</div>
+              <div className="mt-1 text-sm leading-6 text-zinc-700">{text(event.summary, "")}</div>
+            </div>
+          ))
+        ) : (
+          <EmptyPanel text="No decision summaries yet." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ToolCallsPanel({ events }: { events: TraceRecord[] }) {
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <PanelHeader title="Tools called" subtitle="Observable searches, commands, and tool calls captured from the run." icon={<Terminal className="h-4 w-4" />} />
+      <div className="mt-4 grid gap-2">
+        {events.length ? (
+          events.map((event, index) => {
+            const input = asRecord(event.input);
+            const label = text(event.type, "tool").replaceAll("_", " ");
+            const queryOrCommand = text(input.query || input.command || input.tool, "");
+            return (
+              <div key={`${text(event.id, "tool")}-${index}`} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{label}</div>
+                  <StatusBadge status={text(event.status, "completed")} />
+                </div>
+                <div className="mt-2 font-mono text-sm text-zinc-900">{queryOrCommand || text(event.label, "tool_call()")}</div>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">{text(event.summary, "")}</p>
+              </div>
+            );
+          })
+        ) : (
+          <EmptyPanel text="Tool calls will appear here as Codex researches." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ContentIdeaChooser({ ideas, isRunning }: { ideas: ContentIdea[]; isRunning: boolean }) {
+  const [selectedId, setSelectedId] = useState("");
+  const selected = ideas.find((idea) => idea.id === selectedId) || ideas[0] || null;
+
+  useEffect(() => {
+    if (!selectedId && ideas[0]) setSelectedId(ideas[0].id);
+  }, [ideas, selectedId]);
+
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <PanelHeader title="Final decisions" subtitle="Choose one of three content ideas generated from the real run output." icon={<WandSparkles className="h-4 w-4" />} />
+      {ideas.length ? (
+        <div className="mt-4 grid grid-cols-3 gap-3 max-lg:grid-cols-1">
+          {ideas.map((idea, index) => {
+            const active = selected?.id === idea.id;
+            return (
+              <button
+                key={idea.id}
+                type="button"
+                onClick={() => setSelectedId(idea.id)}
+                className={
+                  active
+                    ? "rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-left shadow-sm"
+                    : "rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-left transition-colors hover:border-zinc-300 hover:bg-white"
+                }
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600">Idea {index + 1}</span>
+                  {active ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-5 w-5 text-zinc-400" />}
+                </div>
+                <h2 className="mt-3 text-base font-semibold leading-6 text-zinc-950">{idea.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">{idea.angle}</p>
+                <div className="mt-3 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600">
+                  Target query: {idea.targetQuery || "Captured from run"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-4">
+          <EmptyPanel text={isRunning ? "The three final content ideas will appear when trace analysis finishes." : "Run Codex on a selected Reddit thread to generate three content ideas."} />
+        </div>
+      )}
+
+      {selected ? (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Why this idea</div>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">{selected.rationale}</p>
+          {selected.sourceSignals.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selected.sourceSignals.slice(0, 5).map((signal) => (
+                <span key={signal} className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs text-zinc-700">{signal}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DemoStory({ demo }: { demo: NonNullable<CodexLatestPayload["demo"]> }) {
+  const steps = [
+    {
+      title: "Read the Reddit case",
+      detail: "Lock onto one real pain point instead of generic SEO keywords.",
+      status: "done",
+      icon: <FileText className="h-4 w-4" />
+    },
+    {
+      title: "Run 3 Codex angles",
+      detail: "Urgency, responsibility, and DIY/vendor comparison run as separate lanes.",
+      status: demo.lanes.some((lane) => lane.eventCount > 0) ? "done" : "active",
+      icon: <BrainCircuit className="h-4 w-4" />
+    },
+    {
+      title: "Watch what agents use",
+      detail: "Keep trusted sources, ignored patterns, and repeated queries.",
+      status: demo.counts.trustedSources || demo.repeatedQueries.length ? "done" : demo.isActive ? "active" : "waiting",
+      icon: <Search className="h-4 w-4" />
+    },
+    {
+      title: "Turn it into choices",
+      detail: "End with three content ideas a human can choose from.",
+      status: demo.currentPhaseIndex >= 4 ? "done" : demo.isActive ? "active" : "waiting",
+      icon: <WandSparkles className="h-4 w-4" />
+    }
+  ];
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-4">
+      <PanelHeader title="What Peekaboo is doing" subtitle="A simple story for the demo, with the trace still captured behind it." icon={<Sparkles className="h-4 w-4" />} />
+      <div className="mt-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+        {steps.map((step, index) => (
+          <div
+            key={step.title}
+            className={
+              step.status === "active"
+                ? "rounded-xl border border-amber-200 bg-amber-50 p-4"
+                : step.status === "done"
+                ? "rounded-xl border border-emerald-200 bg-emerald-50 p-4"
+                : "rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+            }
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className={step.status === "active" ? "text-amber-600" : step.status === "done" ? "text-emerald-600" : "text-zinc-400"}>{step.icon}</span>
+              <span className="text-xs font-medium text-zinc-500">{index + 1}</span>
+            </div>
+            <div className="mt-3 font-semibold text-zinc-950">{step.title}</div>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">{step.detail}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
