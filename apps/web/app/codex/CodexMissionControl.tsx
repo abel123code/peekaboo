@@ -11,6 +11,7 @@ import {
   Clock3,
   FileText,
   GitPullRequest,
+  Link2,
   Loader2,
   Play,
   Search,
@@ -106,6 +107,7 @@ export function CodexMissionControl({ initialData, setupError, runId }: CodexMis
               {demo ? <PhaseRail phases={demo.phases} /> : null}
               <CaseBanner selectedThread={selectedThread} fallbackThread={firstThread} />
               {demo ? <AgentTerminalBoard lanes={demo.lanes} action={demo.currentAction} /> : <EmptyPanel text="Start a Codex research run to populate the live trace." />}
+              {demo ? <WriterSourceBoard sources={demo.sourceAccesses} isRunning={isActive} /> : null}
             </div>
           </section>
 
@@ -322,9 +324,13 @@ function PendingLane({ label }: { label: string }) {
 function TerminalEvent({ event }: { event: TraceRecord }) {
   const type = text(event.type, "event");
   const input = asRecord(event.input);
-  const command = text(input.command || input.query || input.tool, "");
+  const output = asRecord(event.output);
+  const sourceUrl = text(input.url || output.url, "");
+  const command = text(input.command || input.query || input.tool || sourceUrl, "");
   const prefix =
-    type === "web_search"
+    type === "source_access"
+      ? "access article"
+      : type === "web_search"
       ? "search"
       : type === "command_execution"
       ? "cmd"
@@ -342,10 +348,82 @@ function TerminalEvent({ event }: { event: TraceRecord }) {
         <span>{prefix}</span>
         <span>{text(event.status, "completed")}</span>
       </div>
-      {command ? <div className="mt-1 break-words text-emerald-300">{command}</div> : null}
+      {sourceUrl ? (
+        <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex max-w-full items-center gap-1 break-all text-emerald-300 hover:text-emerald-200 hover:underline">
+          access_article: {sourceUrl}
+          <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+        </a>
+      ) : command ? (
+        <div className="mt-1 break-words text-emerald-300">{command}</div>
+      ) : null}
       <div className="mt-1 break-words text-zinc-200">{text(event.summary, text(event.label, ""))}</div>
     </div>
   );
+}
+
+function WriterSourceBoard({ sources, isRunning }: { sources: TraceRecord[]; isRunning: boolean }) {
+  const visibleSources = sources.slice(0, 8);
+  const copyReady = visibleSources
+    .map((source, index) => {
+      const url = text(source.url, "");
+      const title = text(source.title, hostFromUrl(url));
+      const agent = text(source.agent_label, "Codex");
+      return `${index + 1}. ${title}\n${url}\nUsed by: ${agent}\nWhy: ${text(source.reason, "Source accessed during research.")}`;
+    })
+    .join("\n\n");
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PanelHeader title="Sources captured for writer" subtitle="Every URL the trace saw as an accessed or trusted source." icon={<Link2 className="h-4 w-4" />} />
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600">
+          {sources.length} source{sources.length === 1 ? "" : "s"} tracked
+        </div>
+      </div>
+
+      {visibleSources.length ? (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+            {visibleSources.map((source, index) => {
+              const url = text(source.url, "");
+              return (
+                <div key={`${url}-${index}`} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-zinc-500">
+                    <span>{text(source.agent_label, "Codex")}</span>
+                    <span>{hostFromUrl(url)}</span>
+                  </div>
+                  <div className="mt-2 font-medium text-zinc-950">{text(source.title, hostFromUrl(url))}</div>
+                  <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-flex max-w-full items-center gap-1 break-all font-mono text-xs text-emerald-700 hover:underline">
+                    {url}
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-500">{text(source.reason, "Source accessed during research.")}</p>
+                </div>
+              );
+            })}
+          </div>
+          <details className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              Copy-ready source list
+            </summary>
+            <pre className="max-h-72 overflow-auto border-t border-zinc-200 p-3 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-700">{copyReady}</pre>
+          </details>
+        </>
+      ) : (
+        <div className="mt-4">
+          <EmptyPanel text={isRunning ? "Article URLs will appear here as Codex searches or opens sources." : "No article URLs were captured for this run yet."} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function hostFromUrl(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url || "source";
+  }
 }
 
 function CaseFile({ selectedThread, fallbackThread }: { selectedThread: TraceRecord; fallbackThread: CodexLatestPayload["redditThreads"][number] | null }) {

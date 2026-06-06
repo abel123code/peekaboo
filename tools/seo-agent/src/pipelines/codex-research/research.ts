@@ -14,7 +14,7 @@ import {
 } from "../../schemas.js";
 import { generateStructuredWithResponses } from "../../lib/openai-responses-client.js";
 import { AgentHarness, type AnyHarnessTool } from "../reddit-intelligence/harness.js";
-import { extractQueries, extractUrlsFromText, normalizeCodexEvent } from "./normalizer.js";
+import { extractQueries, extractUrlsFromText, normalizeCodexEvent, sourceAccessEventsFromEvent } from "./normalizer.js";
 
 loadEnv();
 
@@ -136,6 +136,70 @@ function ignoredSignalsFromAnswer(answer: string, agentLabel: string): CodexSour
       reason: "Codex marked this pattern as weak or less useful.",
       agent_label: agentLabel
     }));
+}
+
+function titleFromSourceEvent(event: CodexTraceEvent, url: string) {
+  const title = typeof event.output.title === "string" ? event.output.title : "";
+  if (title.trim()) return title;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function sourceSignalsFromEvents(events: CodexTraceEvent[], agentLabel: string): CodexSourceSignal[] {
+  return events
+    .filter((event) => event.type === "source_access")
+    .map((event) => {
+      const url = typeof event.input.url === "string" ? event.input.url : typeof event.output.url === "string" ? event.output.url : "";
+      return {
+        title: titleFromSourceEvent(event, url),
+        url,
+        reason: typeof event.output.reason === "string" && event.output.reason.trim()
+          ? event.output.reason
+          : "Codex accessed this source during research.",
+        agent_label: agentLabel
+      };
+    })
+    .filter((source) => source.url)
+    .slice(0, 12);
+}
+
+function mergeSourceSignals(...groups: CodexSourceSignal[][]): CodexSourceSignal[] {
+  const seen = new Set<string>();
+  const merged: CodexSourceSignal[] = [];
+  for (const source of groups.flat()) {
+    const key = source.url || `${source.agent_label}:${source.title}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(source);
+  }
+  return merged.slice(0, 12);
+}
+
+async function appendEventWithSourceAccess(
+  events: CodexTraceEvent[],
+  event: CodexTraceEvent,
+  onEvent: (event: CodexTraceEvent) => Promise<void> | void
+) {
+  events.push(event);
+  await onEvent(event);
+
+  const existingUrls = new Set(
+    events
+      .filter((candidate) => candidate.type === "source_access")
+      .map((candidate) => (typeof candidate.input.url === "string" ? candidate.input.url : ""))
+      .filter(Boolean)
+  );
+
+  for (const sourceEvent of sourceAccessEventsFromEvent(event)) {
+    const url = typeof sourceEvent.input.url === "string" ? sourceEvent.input.url : "";
+    if (!url || existingUrls.has(url)) continue;
+    existingUrls.add(url);
+    events.push(sourceEvent);
+    await onEvent(sourceEvent);
+  }
 }
 
 function defaultResearchAngles(thread: CodexSelectedRedditThread, profile: RedditCompanyProfile, skill: string): CodexResearchAngle[] {
@@ -271,6 +335,10 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
   let rawJsonl = "";
   let stderr = "";
   const events: CodexTraceEvent[] = [];
+  const pendingEmits: Promise<void>[] = [];
+  const pushEvent = (event: CodexTraceEvent) => {
+    pendingEmits.push(Promise.resolve(appendEventWithSourceAccess(events, event, onEvent)));
+  };
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
@@ -297,8 +365,7 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
           const raw = JSON.parse(trimmed) as Record<string, unknown>;
           const normalized = normalizeCodexEvent(raw, { agentId: angle.id, agentLabel: angle.label }, events.length);
           if (normalized) {
-            events.push(normalized);
-            void onEvent(normalized);
+            pushEvent(normalized);
           }
         } catch {
           const normalized = normalizeCodexEvent(
@@ -307,8 +374,7 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
             events.length
           );
           if (normalized) {
-            events.push(normalized);
-            void onEvent(normalized);
+            pushEvent(normalized);
           }
         }
       }
@@ -329,7 +395,7 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
         try {
           const raw = JSON.parse(buffer.trim()) as Record<string, unknown>;
           const normalized = normalizeCodexEvent(raw, { agentId: angle.id, agentLabel: angle.label }, events.length);
-          if (normalized) events.push(normalized);
+          if (normalized) pushEvent(normalized);
         } catch {
           // Ignore trailing non-JSON fragments; stderr is preserved in the thrown error when the process fails.
         }
@@ -342,8 +408,11 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
     });
   });
 
+  await Promise.all(pendingEmits);
+
   if (!events.length) throw new Error(`${angle.label} produced no normalized Codex events.`);
   const finalAnswer = finalAnswerFromEvents(events);
+  const accessedSources = sourceSignalsFromEvents(events, angle.label);
 
   return {
     id: angle.id,
@@ -354,7 +423,7 @@ async function runRealCodexSubagent(angle: CodexResearchAngle, cwd: string, onEv
     raw_jsonl: rawJsonl,
     normalized_events: events,
     final_answer: finalAnswer,
-    trusted_sources: sourceSignalsFromAnswer(finalAnswer, angle.label, angle.angle),
+    trusted_sources: mergeSourceSignals(accessedSources, sourceSignalsFromAnswer(finalAnswer, angle.label, angle.angle)),
     ignored_sources: ignoredSignalsFromAnswer(finalAnswer, angle.label)
   };
 }
@@ -488,8 +557,7 @@ async function runVirtualSubagent(angle: CodexResearchAngle, thread: CodexSelect
             input: event.input || {},
             output: event.output || {}
           };
-          events.push(normalized);
-          await onEvent(normalized);
+          await appendEventWithSourceAccess(events, normalized, onEvent);
         }
       });
       await harness.run();
@@ -511,7 +579,15 @@ async function runVirtualSubagent(angle: CodexResearchAngle, thread: CodexSelect
           agent_id: angle.id,
           agent_label: angle.label,
           input: { query: thread.title },
-          output: {}
+          output: {
+            results: [
+              {
+                title: thread.title,
+                url: thread.url,
+                reason: "Original Reddit pain signal for this Codex run."
+              }
+            ]
+          }
         },
         0
       ),
@@ -530,9 +606,9 @@ async function runVirtualSubagent(angle: CodexResearchAngle, thread: CodexSelect
         1
       )
     ];
-    events.push(...synthetic);
-    for (const event of synthetic) await onEvent(event);
+    for (const event of synthetic) await appendEventWithSourceAccess(events, event, onEvent);
   }
+  const accessedSources = sourceSignalsFromEvents(events, angle.label);
 
   return {
     id: angle.id,
@@ -543,7 +619,7 @@ async function runVirtualSubagent(angle: CodexResearchAngle, thread: CodexSelect
     raw_jsonl: events.map((event) => JSON.stringify(event)).join("\n"),
     normalized_events: events,
     final_answer: finalAnswer,
-    trusted_sources: sourceSignalsFromAnswer(finalAnswer, angle.label, angle.angle),
+    trusted_sources: mergeSourceSignals(accessedSources, sourceSignalsFromAnswer(finalAnswer, angle.label, angle.angle)),
     ignored_sources: ignoredSignalsFromAnswer(finalAnswer, angle.label)
   };
 }

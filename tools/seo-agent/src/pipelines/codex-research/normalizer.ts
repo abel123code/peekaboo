@@ -29,6 +29,26 @@ function truncate(value: string, max = 360) {
   return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
+function titleFromUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/$/, "").split("/").filter(Boolean).slice(-2).join(" / ");
+    return path ? `${parsed.hostname} - ${path}` : parsed.hostname;
+  } catch {
+    return url;
+  }
+}
+
+function collectText(value: unknown, depth = 0): string[] {
+  if (depth > 4) return [];
+  if (typeof value === "string" || typeof value === "number") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap((item) => collectText(item, depth + 1));
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).flatMap((item) => collectText(item, depth + 1));
+  }
+  return [];
+}
+
 function itemText(item: Record<string, unknown>) {
   const direct = text(item.text || item.content || item.message || item.output || item.summary, "");
   if (direct) return direct;
@@ -222,6 +242,40 @@ export function normalizeCodexJsonl(jsonl: string, context: NormalizeContext): C
 
 export function extractUrlsFromText(value: string): string[] {
   return [...new Set(value.match(/https?:\/\/[^\s)"'<]+/g) || [])].slice(0, 20);
+}
+
+export function sourceAccessEventsFromEvent(event: CodexTraceEvent): CodexTraceEvent[] {
+  if (event.type === "source_access") return [];
+
+  const haystack = collectText({
+    summary: event.summary,
+    label: event.label,
+    input: event.input,
+    output: event.output
+  }).join("\n");
+  const urls = extractUrlsFromText(haystack);
+
+  return urls.map((url, index) => ({
+    id: `${event.id}-source-${index + 1}`,
+    timestamp: event.timestamp,
+    phase: "researching",
+    actor: "tool",
+    type: "source_access",
+    label: "Access article",
+    summary: `Access article: ${url}`,
+    status: event.status || "completed",
+    agent_id: event.agent_id,
+    agent_label: event.agent_label,
+    input: {
+      url,
+      source_event_id: event.id
+    },
+    output: {
+      url,
+      title: titleFromUrl(url),
+      reason: event.summary || event.label
+    }
+  }));
 }
 
 export function extractQueries(events: CodexTraceEvent[]): string[] {

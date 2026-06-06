@@ -27,6 +27,8 @@ assert.equal(result.executionMode, "virtual_fallback");
 assert.equal(result.trace.plan.length, 3);
 assert.equal(result.subagents.length, 3);
 assert.ok(result.trace.events.length >= 6);
+assert.ok(result.trace.events.some((event) => event.type === "source_access"));
+assert.ok(result.trace.trusted_sources.some((source) => source.url === thread.url));
 assert.ok(result.contentBrief?.title);
 assert.equal(result.contentBrief?.content_ideas.length, 3);
 assert.ok(result.proposedSkillDiff.includes("Proposed Skill Diff"));

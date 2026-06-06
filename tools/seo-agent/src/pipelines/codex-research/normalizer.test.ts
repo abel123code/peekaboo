@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { extractQueries, normalizeCodexJsonl, parseCodexJsonl } from "./normalizer.js";
+import { extractQueries, normalizeCodexJsonl, parseCodexJsonl, sourceAccessEventsFromEvent } from "./normalizer.js";
 
 const sampleJsonl = [
   JSON.stringify({ type: "thread.started", thread_id: "thread_123" }),
@@ -26,5 +26,23 @@ assert.equal(events.at(-1)?.type, "turn_completed");
 
 const queries = extractQueries(events);
 assert.equal(queries.some((query) => query.includes("HDB toilet overflow")), true);
+
+const sourceEvents = sourceAccessEventsFromEvent({
+  id: "agent-a-message",
+  timestamp: "2026-06-06T00:00:00.000Z",
+  phase: "answering",
+  actor: "codex",
+  type: "agent_message",
+  label: "Agent message",
+  summary: "Codex used https://www.hdb.gov.sg/residential/living-in-an-hdb-flat as a responsibility source.",
+  status: "completed",
+  agent_id: "responsibility-context",
+  agent_label: "Agent B",
+  input: {},
+  output: {}
+});
+assert.equal(sourceEvents.length, 1);
+assert.equal(sourceEvents[0]?.type, "source_access");
+assert.equal(sourceEvents[0]?.input.url, "https://www.hdb.gov.sg/residential/living-in-an-hdb-flat");
 
 console.log("codex normalizer tests passed");

@@ -103,6 +103,7 @@ export type CodexDemoModel = {
   phases: CodexPhase[];
   currentAction: CodexAction;
   lanes: CodexLane[];
+  sourceAccesses: TraceRecord[];
   trustedSources: TraceRecord[];
   ignoredSources: TraceRecord[];
   repeatedQueries: string[];
@@ -110,6 +111,7 @@ export type CodexDemoModel = {
   counts: {
     events: number;
     subagents: number;
+    sourceAccesses: number;
     trustedSources: number;
     ignoredSources: number;
   };
@@ -324,9 +326,65 @@ function lanesFromTrace(trace: CodexTrace, subagents: CodexSubagentSummary[]): C
   return [...fromRows, ...missing];
 }
 
+function urlFromRecord(record: TraceRecord) {
+  const input = asRecord(record.input);
+  const output = asRecord(record.output);
+  return text(input.url || output.url || record.url, "");
+}
+
+function titleFromUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function sourceAccessesFromTrace(trace: CodexTrace) {
+  const seen = new Set<string>();
+  const sources: TraceRecord[] = [];
+  const push = (source: TraceRecord) => {
+    const url = urlFromRecord(source);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    sources.push(source);
+  };
+
+  trace.events
+    .filter((event) => text(event.type, "") === "source_access")
+    .forEach((event) => {
+      const output = asRecord(event.output);
+      const url = urlFromRecord(event);
+      push({
+        id: text(event.id, url),
+        title: text(output.title, titleFromUrl(url)),
+        url,
+        reason: text(output.reason, text(event.summary, "Codex accessed this source during research.")),
+        agent_label: text(event.agent_label, ""),
+        source_event_id: text(asRecord(event.input).source_event_id, "")
+      });
+    });
+
+  trace.trusted_sources.forEach((source) => {
+    const url = text(source.url, "");
+    if (!url) return;
+    push({
+      id: text(source.id, url),
+      title: text(source.title, titleFromUrl(url)),
+      url,
+      reason: text(source.reason, "Codex listed this as a trusted source."),
+      agent_label: text(source.agent_label, "")
+    });
+  });
+
+  return sources;
+}
+
 export function deriveCodexDemo(run: CodexRunSummary | null, trace: CodexTrace, subagents: CodexSubagentSummary[]): CodexDemoModel {
   const phaseIndex = currentPhase(run, trace);
   const lanes = lanesFromTrace(trace, subagents);
+  const sourceAccesses = sourceAccessesFromTrace(trace);
   return {
     isActive: run?.status === "queued" || run?.status === "running",
     currentPhaseIndex: phaseIndex,
@@ -336,6 +394,7 @@ export function deriveCodexDemo(run: CodexRunSummary | null, trace: CodexTrace, 
     })),
     currentAction: currentAction(run, trace, phaseIndex),
     lanes,
+    sourceAccesses,
     trustedSources: trace.trusted_sources,
     ignoredSources: trace.ignored_sources,
     repeatedQueries: trace.repeated_queries,
@@ -343,6 +402,7 @@ export function deriveCodexDemo(run: CodexRunSummary | null, trace: CodexTrace, 
     counts: {
       events: trace.events.length,
       subagents: lanes.length,
+      sourceAccesses: sourceAccesses.length,
       trustedSources: trace.trusted_sources.length,
       ignoredSources: trace.ignored_sources.length
     }
