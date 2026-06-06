@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Peekaboo AEO Post Viewer</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #111;
+        background: #fafafa;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 32px 20px 72px;
+        background: white;
+      }
+      h1 {
+        font-size: 40px;
+        line-height: 1.1;
+        margin-bottom: 12px;
+      }
+      .meta {
+        color: #666;
+        margin-bottom: 24px;
+      }
+      .summary {
+        background: #f3f6f4;
+        padding: 16px 20px;
+        margin: 24px 0;
+      }
+      .content h2 {
+        margin-top: 36px;
+        font-size: 28px;
+      }
+      .content h3 {
+        margin-top: 26px;
+        font-size: 22px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f0f0f0;
+      }
+      .cta {
+        border: 2px solid #111;
+        padding: 28px;
+        margin: 32px 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: center;
+      }
+      .cta h2 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      .cta p {
+        margin: 0;
+      }
+      .cta a {
+        background: #000;
+        color: white;
+        text-decoration: none;
+        padding: 14px 22px;
+        border-radius: 6px;
+        white-space: nowrap;
+        font-weight: bold;
+      }
+      pre {
+        white-space: pre-wrap;
+      }
+      @media (max-width: 700px) {
+        .cta {
+          display: block;
+        }
+        .cta a {
+          display: inline-block;
+          margin-top: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app">Loading...</main>
+    <script>
+      const app = document.querySelector("#app");
+
+      function esc(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function inline(value) {
+        return esc(value)
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\*(.+?)\*/g, "<em>$1</em>")
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      }
+
+      function ctaHtml(lines, startIndex, siteUrl) {
+        const cta = {};
+        let i = startIndex + 1;
+        while (i < lines.length && lines[i].trim() !== ":::") {
+          const line = lines[i].trim();
+          const index = line.indexOf(":");
+          if (index !== -1) {
+            cta[line.slice(0, index).trim()] = line.slice(index + 1).trim();
+          }
+          i++;
+        }
+        return {
+          nextIndex: i,
+          html: `
+            <section class="cta">
+              <div>
+                <h2>${inline(cta.headline || "Ready to learn more?")}</h2>
+                <p>${inline(cta.description || "Visit the main website for more details.")}</p>
+              </div>
+              <a href="${esc(siteUrl)}">${esc(cta.button || "Visit website")}</a>
+            </section>
+          `
+        };
+      }
+
+      function markdown(markdownText, siteUrl, fallbackCta) {
+        const lines = String(markdownText || "").split(/\r?\n/);
+        const out = [];
+        let paragraph = [];
+        let list = null;
+        let hasCta = false;
+
+        function flushParagraph() {
+          if (paragraph.length) {
+            out.push(`<p>${inline(paragraph.join(" "))}</p>`);
+            paragraph = [];
+          }
+        }
+        function closeList() {
+          if (list) out.push(`</${list}>`);
+          list = null;
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line === ":::cta") {
+            hasCta = true;
+            flushParagraph();
+            closeList();
+            const cta = ctaHtml(lines, i, siteUrl);
+            out.push(cta.html);
+            i = cta.nextIndex;
+            continue;
+          }
+          if (!line || line === "---") {
+            flushParagraph();
+            closeList();
+            continue;
+          }
+          const h = line.match(/^(#{2,4})\s+(.+)$/);
+          if (h) {
+            flushParagraph();
+            closeList();
+            const level = Math.min(h[1].length, 3);
+            out.push(`<h${level}>${inline(h[2])}</h${level}>`);
+            continue;
+          }
+          const li = line.match(/^[-*]\s+(.+)$/);
+          if (li) {
+            flushParagraph();
+            if (list !== "ul") {
+              closeList();
+              list = "ul";
+              out.push("<ul>");
+            }
+            out.push(`<li>${inline(li[1])}</li>`);
+            continue;
+          }
+          closeList();
+          paragraph.push(line);
+        }
+        flushParagraph();
+        closeList();
+
+        if (!hasCta) {
+          out.push(`
+            <section class="cta">
+              <div>
+                <h2>${inline(fallbackCta?.headline || "Ready to learn more?")}</h2>
+                <p>${inline(fallbackCta?.description || "Visit the main website for more details.")}</p>
+              </div>
+              <a href="${esc(siteUrl)}">${esc(fallbackCta?.button_label || "Visit website")}</a>
+            </section>
+          `);
+        }
+        return out.join("\n");
+      }
+
+      async function run() {
+        const runs = await fetch("/api/runs").then((r) => r.json());
+        const selected = runs.runs[0];
+        if (!selected) {
+          app.textContent = "No generated outputs found.";
+          return;
+        }
+        const data = await fetch(`/api/runs/${encodeURIComponent(selected.id)}`).then((r) => r.json());
+        const post = data.post;
+        const siteUrl = post.source_task?.website?.url || "#";
+        app.innerHTML = `
+          <article>
+            <p class="meta">${esc(post.target_keyword)} · /${esc(post.slug)}</p>
+            <h1>${esc(post.title)}</h1>
+            <p>${esc(post.excerpt)}</p>
+            <section class="summary">
+              <strong>Summary</strong>
+              <ul>${(post.summary_bullets || []).map((item) => `<li>${inline(item)}</li>`).join("")}</ul>
+            </section>
+            <div class="content">${markdown(post.content, siteUrl, post.cta_banner)}</div>
+          </article>
+        `;
+      }
+
+      run().catch((error) => {
+        app.innerHTML = `<pre>${esc(error.stack || error.message || error)}</pre>`;
+      });
+    </script>
+  </body>
+</html>

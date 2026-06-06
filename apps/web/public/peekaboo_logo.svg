@@ -1,0 +1,14 @@
+<svg viewBox="0 0 420 140" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Peekaboo</title>
+  <desc>Peekaboo wordmark with an eye-shaped answer visibility mark</desc>
+
+  <g transform="translate(8 30)">
+    <path d="M8 40C25 14 50 1 83 1s58 13 75 39c-17 26-42 39-75 39S25 66 8 40Z" fill="#f8fafc" stroke="#18181b" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="83" cy="40" r="22" fill="#14b8a6"/>
+    <circle cx="83" cy="40" r="9" fill="#18181b"/>
+    <circle cx="92" cy="29" r="5" fill="#ffffff"/>
+  </g>
+
+  <text x="188" y="78" fill="#09090b" font-family="var(--font-sans, system-ui, sans-serif)" font-size="54" font-weight="650">Peekaboo</text>
+  <text x="191" y="108" fill="#52525b" font-family="var(--font-sans, system-ui, sans-serif)" font-size="13" font-weight="600" letter-spacing="1.2">CODEX-POWERED AEO</text>
+</svg>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Peekaboo AEO Post Viewer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="eyebrow">Peekaboo AEO</span>
+        <h1>Post Viewer</h1>
+      </div>
+      <label class="run-picker">
+        <span>Output Run</span>
+        <select id="runSelect"></select>
+      </label>
+      <div id="runMeta" class="run-meta"></div>
+      <nav class="tabs" aria-label="Viewer tabs">
+        <button class="tab active" data-view="post">Article</button>
+        <button class="tab" data-view="seo">AEO</button>
+        <button class="tab" data-view="json">JSON</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section id="status" class="status">Loading output runs...</section>
+
+      <article id="postView" class="article hidden">
+        <header class="article-header">
+          <div class="meta-row">
+            <span id="targetKeyword" class="pill"></span>
+            <span id="slug" class="muted"></span>
+          </div>
+          <h2 id="title"></h2>
+          <p id="excerpt" class="excerpt"></p>
+          <div id="summaryBullets" class="summary"></div>
+          <div id="heroImage" class="hero-image"></div>
+        </header>
+        <div id="content" class="content"></div>
+      </article>
+
+      <section id="seoView" class="panel hidden">
+        <h2>AEO Review</h2>
+        <div id="seoReview"></div>
+      </section>
+
+      <section id="jsonView" class="panel hidden">
+        <h2>Raw JSON</h2>
+        <pre id="rawJson"></pre>
+      </section>
+    </main>
+
+    <script src="/viewer.js"></script>
+  </body>
+</html>
