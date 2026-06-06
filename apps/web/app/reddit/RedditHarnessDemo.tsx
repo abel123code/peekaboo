@@ -164,9 +164,6 @@ function TopBar({ isActive }: { isActive: boolean }) {
       <Link href="/clients" className="shrink-0">
         <PeekabooLogo size="md" className="max-sm:h-14 max-sm:w-48" />
       </Link>
-      <div className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 md:block">
-        Reddit agent harness
-      </div>
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-700 sm:flex">
           <span className={isActive ? "h-2 w-2 rounded-full bg-emerald-500 motion-safe:animate-pulse" : "h-2 w-2 rounded-full bg-zinc-300"} />
